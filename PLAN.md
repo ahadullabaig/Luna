@@ -185,11 +185,13 @@ data class CycleState(
 )
 ```
 
-**Phase boundaries** (assuming 28-day cycle; generalize by scaling):
+**Phase boundaries** (generalized for any cycle length):
 - Menstrual: days 1 through `periodLength` (default 5)
-- Follicular: `periodLength + 1` through `cycleLength / 2 - 2` (~day 6–13)
-- Ovulation: 3-day window centered on `cycleLength / 2` (~day 13–15)
-- Luteal: remainder through `cycleLength` (~day 16–28)
+- Follicular: `periodLength + 1` through `ovulationDay - 2`
+- Ovulation: 3-day window — `ovulationDay - 1` through `ovulationDay + 1`
+- Luteal: remainder through `cycleLength`
+
+where `ovulationDay = cycleLength - 14`. The luteal phase (ovulation → next period) is relatively fixed at ~14 days for most people; it's the follicular phase that varies. Anchoring ovulation to 14 days before the next predicted period gives accurate results for any cycle length, not just 28-day cycles. For example: a 32-day cycle puts ovulation at day 18, not day 16.
 
 **Averaging logic:** `cycleLength` = median gap between consecutive `PeriodEntity.startDate`s over the last 6 cycles. `periodLength` = median of `endDate - startDate` over the last 6 completed cycles — exclude any row where `endDate` is null (period still ongoing), since its true length is unknown; if the in-progress period is the only one logged, fall back to the default. If fewer than 2 completed cycles are available, fall back to 28 / 5.
 
