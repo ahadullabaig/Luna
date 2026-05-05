@@ -25,7 +25,6 @@ Your menstrual cycle is one of the most intimate windows into your health. It sh
 **Luna is a period tracker with one non-negotiable rule: your data lives on your phone, and nowhere else.** No cloud. No account. No analytics. No server that could be breached, subpoenaed, or sold. The app works completely offline, by design — not as a setting you have to find, but as the only mode that exists.
 
 Open it. Track your cycle. Close it. Nothing left behind but the information you chose to keep.
-
 <br>
 
 ---
@@ -37,7 +36,6 @@ Most period-tracking apps are data businesses dressed up in pastel. They offer f
 Luna was built because the alternative is unacceptable. Cycle data can reveal whether you might be pregnant, what health conditions you may have, and life decisions you haven't made public. That information belongs to you.
 
 The only data that cannot be leaked is data that was never collected in the first place.
-
 <br>
 
 ---
@@ -58,7 +56,6 @@ The calendar view colors every date by its phase — historical periods shown as
 
 **Predicts, but stays honest.**
 If your period hasn't arrived and it's been more than three days since the predicted date, Luna says so plainly: *Period overdue by X days.* No silent re-predictions. No pretending everything is fine.
-
 <br>
 
 ---
@@ -73,7 +70,6 @@ If your period hasn't arrived and it's been more than three days since the predi
 Luna's `AndroidManifest.xml` declares zero internet permissions. The app is physically incapable of sending data anywhere — not because of a privacy policy, but because the networking code does not exist. You can verify this in the source.
 
 No account means there is nothing to delete, no profile to request, no data to ask them to forget. You stop using the app; the data stays on your phone until you uninstall it.
-
 <br>
 
 ---
@@ -104,7 +100,6 @@ Then install on a connected device:
 ```bash
 ./gradlew installDebug
 ```
-
 <br>
 
 ---
@@ -117,7 +112,6 @@ Then install on a connected device:
 4. Luna immediately calculates your phase and starts predicting forward
 
 That's the entire onboarding. There is no step 5.
-
 <br>
 
 ---
@@ -138,7 +132,6 @@ That's the entire onboarding. There is no step 5.
 | Calendar view | kizitonwose/calendar | Custom day cells with phase-colored backgrounds |
 
 Single-module project. No clean-architecture ceremony. MVVM is enough for a personal app you maintain alone.
-
 <br>
 
 ---
