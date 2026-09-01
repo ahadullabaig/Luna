@@ -12,3 +12,4 @@ keystore.properties
 build_error.txt
 build_out.txt
 .vscode/
+*.hprof
