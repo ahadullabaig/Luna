@@ -70,6 +70,8 @@ dependencies {
     implementation(libs.kizitonwose.calendar)
 
     debugImplementation(libs.compose.ui.tooling)
+
+    testImplementation(libs.junit)
 }
 
 kotlin { jvmToolchain(21) }
