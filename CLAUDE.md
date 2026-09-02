@@ -30,7 +30,11 @@ Luna is a **local-only Android period tracker** — no network, no backend, no a
 ./gradlew test
 ```
 
-**KSP/Kotlin version lockstep:** The KSP version prefix must always match the Kotlin version exactly. If you bump `kotlin`, update `ksp` in `gradle/libs.versions.toml` in the same commit. The current pairing is `kotlin = "2.1.20"` / `ksp = "2.1.20-1.0.31"`.
+**Toolchain versions** live in `gradle/libs.versions.toml`. Current: `agp = "9.3.2"`, `kotlin = "2.2.10"`, `ksp = "2.3.6"`, Gradle `9.5.0`.
+
+KSP no longer carries a Kotlin version prefix — KSP2 versions independently, so `ksp = "2.3.6"` pairs with `kotlin = "2.2.10"` with no lockstep rule to honour. (Earlier revisions of this file claimed the prefix must match; that was true of KSP1's `2.1.20-1.0.31` scheme and is no longer.) If a Kotlin bump breaks annotation processing, bump `ksp` to its own latest rather than hunting for a matching prefix.
+
+**Memory:** `kspDebugKotlin` will die with `OutOfMemoryError: Metaspace` under the default daemon heap. `gradle.properties` sets `org.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1024m`; don't remove it.
 
 ---
 
@@ -48,13 +52,13 @@ Single `app` module. MVVM. Package layout by feature, not by layer.
 
 ## Current milestone status
 
-Milestones 1 (skeleton/theme) and 2 (data layer) are complete. The data layer is fully wired. `HomeScreen` currently shows a debug period counter and an "Insert Fake Period" button — this is intentional Milestone 2 scaffolding to be replaced in Milestone 3.
+Milestones 1 (skeleton/theme), 2 (data layer) and 3 (home screen) are complete. The M2 debug scaffolding — the period counter and "Insert Fake Period" button — is gone, replaced by the real home screen.
 
-**Milestone 3 (Home screen)** is next: phase donut Canvas, `GetCurrentCycleState` use case, `CycleState` domain model, symptom chip UI wired to `DailyLogEntity`, and a FAB-triggered date picker that inserts `PeriodEntity`.
+**Milestone 4 (Calendar screen)** is next: `kizitonwose/Calendar`, a custom `PhaseDayCell`, and phase projection across arbitrary months. See the Calendar screen section below.
 
-**Milestone 4:** Calendar screen with `kizitonwose/Calendar`, custom `PhaseDayCell`, phase projection.
+**Milestone 5:** Empty states, app icon, signing config, release APK. Note `app/build.gradle.kts` already references `proguard-rules.pro`, which does not exist — `assembleRelease` fails until M5 creates it.
 
-**Milestone 5:** Empty states, app icon, signing config, release APK.
+**Known debt, deliberately unaddressed:** `allowBackup="true"` in the manifest contradicts the local-only privacy claim; `fallbackToDestructiveMigration()` is still armed with `exportSchema = false`; `PeriodDao.getRecentPeriods()` and its `CycleRepository` passthrough are dead code (M3 reads full history as a `Flow` instead).
 
 ---
 
@@ -70,12 +74,16 @@ Milestones 1 (skeleton/theme) and 2 (data layer) are complete. The data layer is
 
 **Averaging:** `cycleLength` = median gap over last 6 periods. `periodLength` = median over last 6 *completed* periods (exclude rows where `endDate` is null). Fall back to 28/5 if fewer than 2 completed cycles.
 
+Period length is **inclusive of both endpoints** — `startDate.daysUntil(endDate) + 1`, so a period that starts and ends on the same day is 1 day, not 0. PLAN.md §6 writes this as `endDate - startDate` and is off by one; the code is correct, the doc is not.
+
 **Edge cases that must be handled explicitly:**
 - No periods logged → empty state ("Log your first period to get started"), not a donut.
 - Today is inside a logged period → phase is MENSTRUAL regardless of calculation.
 - Today is past `nextPeriodStart` + 3-day grace → "Period overdue by X days" state.
 
-`CycleState` and the use cases (`GetCurrentCycleState`, `GetPhaseForDate`) live in `domain/` and do not exist yet — they are Milestone 3 work.
+**Where this lives:** the pure functions are top-level in `domain/usecase/CycleMath.kt` — `computeCycleState(periods, today)` and `computePhaseForDate(date, periods)` are the entry points, and they take plain lists, not a repository. `GetCurrentCycleState` and `GetPhaseForDate` are thin `Flow` wrappers over `CycleRepository` that delegate to them. Keep new cycle logic in `CycleMath.kt`: the split is what makes it testable without mocking Room.
+
+Tests are in `app/src/test/java/com/luna/app/domain/usecase/` — 26 covering the medians, every phase boundary day-by-day, the three edge cases above, and the invariant that `phaseSegments()` always sums to `cycleLength`.
 
 ---
 
@@ -110,9 +118,11 @@ Dark-only theme (`darkColorScheme`). Four palette constants in `ui/theme/Color.k
 
 ---
 
-## Phase donut (Milestone 3)
+## Phase donut (built — `feature/home/components/PhaseDonut.kt`)
 
 Custom Compose `Canvas` — do not reach for a chart library. The donut is `drawArc` calls (one per phase) plus a filled-circle marker for the current day. Start angle is `-90f` (12 o'clock). Sweep per phase = `(phaseDays / cycleLength) * 360f`. Center text ("Follicular / Day 8 / 12 days until period") goes in a `Box` wrapping the `Canvas` with `Alignment.Center`.
+
+As built, it draws from `phaseSegments()` rather than one arc per phase — a short cycle can drop a phase entirely, and run-length encoding day 1..`cycleLength` guarantees the sweeps sum to 360° in every case. Segments are separated by a `1.6f` degree gap over a 6%-alpha track ring, and the sweep animates in once over 900ms.
 
 ---
 
