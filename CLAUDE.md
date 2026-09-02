@@ -52,11 +52,9 @@ Single `app` module. MVVM. Package layout by feature, not by layer.
 
 ## Current milestone status
 
-Milestones 1 (skeleton/theme), 2 (data layer) and 3 (home screen) are complete. The M2 debug scaffolding — the period counter and "Insert Fake Period" button — is gone, replaced by the real home screen.
+Milestones 1 (skeleton/theme), 2 (data layer), 3 (home screen) and 4 (calendar) are complete. The M2 debug scaffolding — the period counter and "Insert Fake Period" button — is gone, replaced by the real home screen, and the calendar is reachable from the date icon beside the home header.
 
-**Milestone 4 (Calendar screen)** is next: `kizitonwose/Calendar`, a custom `PhaseDayCell`, and phase projection across arbitrary months. See the Calendar screen section below.
-
-**Milestone 5:** Empty states, app icon, signing config, release APK. Note `app/build.gradle.kts` already references `proguard-rules.pro`, which does not exist — `assembleRelease` fails until M5 creates it.
+**Milestone 5** is next: Empty states, app icon, signing config, release APK. Note `app/build.gradle.kts` already references `proguard-rules.pro`, which does not exist — `assembleRelease` fails until M5 creates it.
 
 **Known debt, deliberately unaddressed:** `allowBackup="true"` in the manifest contradicts the local-only privacy claim; `fallbackToDestructiveMigration()` is still armed with `exportSchema = false`; `PeriodDao.getRecentPeriods()` and its `CycleRepository` passthrough are dead code (M3 reads full history as a `Flow` instead).
 
@@ -126,9 +124,15 @@ As built, it draws from `phaseSegments()` rather than one arc per phase — a sh
 
 ---
 
-## Calendar screen (Milestone 4)
+## Calendar screen (built — `feature/calendar/`)
 
-Uses `com.kizitonwose.calendar:compose`. Custom `PhaseDayCell` composable renders a background circle in the phase color with the day number in `LunaCream`. Phase for arbitrary dates: walk back to the nearest logged `PeriodEntity.startDate`, compute offset, project forward using `cycleLength` for future dates.
+Uses `com.kizitonwose.calendar:compose` 2.6.1, which is the **java.time** flavour — `CalendarDay.date` is a `java.time.LocalDate` and `rememberCalendarState` takes `java.time.YearMonth`, while the rest of the app speaks `kotlinx.datetime`. Convert at the boundary with `toKotlinLocalDate()` / `toJavaLocalDate()`; `minSdk = 26` means no desugaring is needed. Only core Material icons are on the classpath, so there is no `ChevronLeft` or `CalendarMonth` — use `KeyboardArrowLeft`/`Right` and `DateRange`.
+
+**`PhaseDayCell` encodes two things at once.** Colour is the phase. Solid-versus-hollow is provenance: a period day the user logged is a filled circle, one the app merely expects — next month's, or one inferred across a gap in logging — is a ring. Menstrual is the only phase a user can record, so it is the only one that carries the distinction; the other three stay soft tints. Never let a prediction render as a record.
+
+**`CycleProjection`** (`domain/usecase/CycleProjection.kt`) resolves the medians once and answers `infoFor(date)` per cell — a grid asks about 42 dates, and `computePhaseForDate` would redo the whole median derivation for each. It is a data class so Compose can skip recomposition when history has not changed; `computePhaseForDate` now delegates to it, so there is one implementation of the rule.
+
+`rememberCalendarState` is keyed on its month bounds via `rememberSaveable(inputs = …)`, so changing them **recreates** the state and resets the scroll. The bounds come from `CalendarUiState.rangeStart/rangeEnd`, which move only when today's month changes — a plain midnight rollover leaves the scroll position alone.
 
 ---
 

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.luna.app.data.entity.DailyLogEntity
 import com.luna.app.data.entity.PeriodEntity
 import com.luna.app.data.repo.CycleRepository
+import com.luna.app.domain.currentDate
 import com.luna.app.domain.model.Energy
 import com.luna.app.domain.model.FlowLevel
 import com.luna.app.domain.usecase.GetCurrentCycleState
@@ -19,10 +20,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.todayIn
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -92,7 +90,4 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
-
-    private fun currentDate(): LocalDate =
-        Clock.System.todayIn(TimeZone.currentSystemDefault())
 }

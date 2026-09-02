@@ -16,9 +16,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -50,6 +52,7 @@ import kotlinx.datetime.LocalDate
 
 @Composable
 fun HomeScreen(
+    onOpenCalendar: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -81,8 +84,20 @@ fun HomeScreen(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(16.dp))
-            DateHeader(state.today)
+            Spacer(Modifier.height(4.dp))
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                DateHeader(state.today)
+                IconButton(
+                    onClick = onOpenCalendar,
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = "Open calendar",
+                        tint = LunaCream.copy(alpha = 0.7f)
+                    )
+                }
+            }
             Spacer(Modifier.height(24.dp))
 
             if (!state.isLoading) {

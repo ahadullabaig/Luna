@@ -13,4 +13,13 @@ data class DailyLogEntity(
     val painFlags: Int = 0,              // bitmask: cramps, headache, backache, bloating
     val energy: Energy? = null,          // NEUTRAL, TIRED, ENERGETIC
     val bodyFlags: Int = 0               // bitmask: fever, nausea
-)
+) {
+    /**
+     * True when nothing at all is recorded. Toggling a chip on and then off leaves the row in
+     * place with every column cleared, and such a day must not read as "logged".
+     *
+     * A getter with no backing field, so Room does not see it as a column.
+     */
+    val isEmpty: Boolean
+        get() = flowLevel == null && energy == null && painFlags == 0 && bodyFlags == 0
+}

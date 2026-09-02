@@ -10,16 +10,16 @@ import com.luna.app.feature.home.HomeScreen
 @Composable
 fun LunaNavHost() {
     val navController = rememberNavController()
-    
+
     NavHost(
         navController = navController,
         startDestination = HomeRoute
     ) {
         composable<HomeRoute> {
-            HomeScreen()
+            HomeScreen(onOpenCalendar = { navController.navigate(CalendarRoute) })
         }
         composable<CalendarRoute> {
-            CalendarScreen()
+            CalendarScreen(onBack = { navController.popBackStack() })
         }
     }
 }
