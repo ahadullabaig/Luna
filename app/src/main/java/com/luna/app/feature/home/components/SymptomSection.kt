@@ -16,37 +16,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.luna.app.data.entity.DailyLogEntity
-import com.luna.app.domain.model.BodyFlag
 import com.luna.app.domain.model.Energy
 import com.luna.app.domain.model.FlowLevel
-import com.luna.app.domain.model.PainFlag
+import com.luna.app.ui.common.bodyLabels
+import com.luna.app.ui.common.energyLabels
+import com.luna.app.ui.common.flowLabels
+import com.luna.app.ui.common.painLabels
 import com.luna.app.ui.theme.LunaBlush
 import com.luna.app.ui.theme.LunaCream
 import com.luna.app.ui.theme.LunaDeepNavy
-
-private val painChips = listOf(
-    PainFlag.CRAMPS to "Cramps",
-    PainFlag.HEADACHE to "Headache",
-    PainFlag.BACKACHE to "Backache",
-    PainFlag.BLOATING to "Bloating"
-)
-
-private val bodyChips = listOf(
-    BodyFlag.FEVER to "Fever",
-    BodyFlag.NAUSEA to "Nausea"
-)
-
-private val flowChips = listOf(
-    FlowLevel.LIGHT to "Light",
-    FlowLevel.MEDIUM to "Medium",
-    FlowLevel.HEAVY to "Heavy"
-)
-
-private val energyChips = listOf(
-    Energy.TIRED to "Tired",
-    Energy.NEUTRAL to "Neutral",
-    Energy.ENERGETIC to "Energetic"
-)
 
 /**
  * Today's symptoms as four groups of chips. There is no save button: every tap writes
@@ -66,7 +44,7 @@ fun SymptomSection(
         verticalArrangement = Arrangement.spacedBy(22.dp)
     ) {
         ChipGroup(title = "Flow") {
-            flowChips.forEach { (level, label) ->
+            flowLabels.forEach { (level, label) ->
                 val selected = log?.flowLevel == level
                 LunaChip(label = label, selected = selected) {
                     onFlowSelected(if (selected) null else level)
@@ -75,7 +53,7 @@ fun SymptomSection(
         }
 
         ChipGroup(title = "Pain") {
-            painChips.forEach { (flag, label) ->
+            painLabels.forEach { (flag, label) ->
                 LunaChip(
                     label = label,
                     selected = (log?.painFlags ?: 0) and flag != 0
@@ -84,7 +62,7 @@ fun SymptomSection(
         }
 
         ChipGroup(title = "Energy") {
-            energyChips.forEach { (energy, label) ->
+            energyLabels.forEach { (energy, label) ->
                 val selected = log?.energy == energy
                 LunaChip(label = label, selected = selected) {
                     onEnergySelected(if (selected) null else energy)
@@ -93,7 +71,7 @@ fun SymptomSection(
         }
 
         ChipGroup(title = "Body") {
-            bodyChips.forEach { (flag, label) ->
+            bodyLabels.forEach { (flag, label) ->
                 LunaChip(
                     label = label,
                     selected = (log?.bodyFlags ?: 0) and flag != 0

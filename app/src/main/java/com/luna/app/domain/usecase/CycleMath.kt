@@ -164,21 +164,11 @@ fun computeCycleState(periods: List<PeriodEntity>, today: LocalDate): CycleState
 }
 
 /**
- * Phase for an arbitrary date, past or future — the projection the calendar grid needs.
+ * Phase for an arbitrary date, past or future. Returns null for dates that precede all logged
+ * history, which cannot be placed.
  *
- * Walks back to the nearest logged period start at or before [date]; dates beyond the last
- * logged period repeat the personalised cycle length forward. Returns null for dates that
- * precede all logged history, which cannot be placed.
+ * A one-shot convenience over [CycleProjection]: it rebuilds the projection on every call, so
+ * prefer holding a [projectionFrom] result when asking about more than a handful of dates.
  */
-fun computePhaseForDate(date: LocalDate, periods: List<PeriodEntity>): CyclePhase? {
-    if (periods.isEmpty()) return null
-
-    val cycleLength = cycleLengthFrom(periods) ?: DEFAULT_CYCLE_LENGTH
-    val periodLength = periodLengthFrom(periods) ?: DEFAULT_PERIOD_LENGTH
-
-    periodCovering(date, periods, periodLength)?.let { return CyclePhase.MENSTRUAL }
-
-    val anchor = periods.filter { it.startDate <= date }.maxByOrNull { it.startDate } ?: return null
-    val dayInCycle = anchor.startDate.daysUntil(date).mod(cycleLength) + 1
-    return phaseForDay(dayInCycle, cycleLength, periodLength)
-}
+fun computePhaseForDate(date: LocalDate, periods: List<PeriodEntity>): CyclePhase? =
+    projectionFrom(periods).infoFor(date).phase

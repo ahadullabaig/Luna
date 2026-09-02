@@ -24,3 +24,16 @@ val CyclePhase.label: String
         CyclePhase.OVULATION -> "Ovulation"
         CyclePhase.LUTEAL -> "Luteal"
     }
+
+/**
+ * Readable text on top of a filled [color] swatch.
+ *
+ * The two full-strength phases are light enough to need navy on them; the 40% variants sit over
+ * the navy background and stay dark, so they take cream. Keeping the rule here means the donut
+ * and the calendar cells can never disagree about it.
+ */
+val CyclePhase.onColor: Color
+    get() = when (this) {
+        CyclePhase.MENSTRUAL, CyclePhase.OVULATION -> LunaDeepNavy
+        CyclePhase.FOLLICULAR, CyclePhase.LUTEAL -> LunaCream
+    }
