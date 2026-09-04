@@ -1,9 +1,9 @@
 package com.luna.app.feature.home
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,18 +12,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,9 +43,13 @@ import com.luna.app.feature.home.components.LogPeriodDialog
 import com.luna.app.feature.home.components.PhaseDonut
 import com.luna.app.feature.home.components.SymptomSection
 import com.luna.app.ui.theme.LunaBlush
-import com.luna.app.ui.theme.LunaCream
 import com.luna.app.ui.theme.LunaDeepNavy
+import com.luna.app.ui.theme.LunaHairline
+import com.luna.app.ui.theme.LunaTextPrimary
+import com.luna.app.ui.theme.LunaTextSecondary
 import kotlinx.datetime.LocalDate
+
+private const val LOG_PERIOD = "Log a period"
 
 @Composable
 fun HomeScreen(
@@ -67,13 +68,15 @@ fun HomeScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            FloatingActionButton(
+            // One app, one primary action — so it says which one. A bare "+" spent a whole
+            // floating button saying nothing.
+            ExtendedFloatingActionButton(
                 onClick = { showLogDialog = true },
                 containerColor = LunaBlush,
-                contentColor = LunaDeepNavy
-            ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Log a period")
-            }
+                contentColor = LunaDeepNavy,
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text(text = LOG_PERIOD, style = MaterialTheme.typography.titleMedium) }
+            )
         }
     ) { padding ->
         Column(
@@ -81,45 +84,34 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 24.dp)
         ) {
-            Spacer(Modifier.height(4.dp))
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                DateHeader(state.today)
-                IconButton(
-                    onClick = onOpenCalendar,
-                    modifier = Modifier.align(Alignment.CenterEnd)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DateRange,
-                        contentDescription = "Open calendar",
-                        tint = LunaCream.copy(alpha = 0.7f)
-                    )
-                }
-            }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(8.dp))
+            DateHeader(
+                today = state.today,
+                cycleDay = state.cycle?.cycleDay,
+                onOpenCalendar = onOpenCalendar
+            )
+            Spacer(Modifier.height(28.dp))
 
             if (!state.isLoading) {
                 val cycle = state.cycle
-                if (cycle == null) {
-                    EmptyCycleRing()
-                } else {
-                    if (cycle.isOverdue) {
-                        OverdueBanner(cycle)
-                        Spacer(Modifier.height(20.dp))
-                    }
-                    PhaseDonut(state = cycle)
-                    Spacer(Modifier.height(20.dp))
-                    CycleFootnote(cycle)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        // The ring is the one thing on this screen that is centred. Everything
+                        // else hangs off the left margin, so there is a spine to read down.
+                        .padding(bottom = 20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (cycle == null) EmptyCycleRing() else PhaseDonut(state = cycle)
                 }
+                if (cycle != null) CycleFootnote(cycle)
             } else {
-                Spacer(Modifier.height(280.dp))
+                Spacer(Modifier.height(300.dp))
             }
 
-            Spacer(Modifier.height(36.dp))
-            HorizontalDivider(color = LunaCream.copy(alpha = 0.08f))
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(40.dp))
 
             SymptomSection(
                 log = state.todayLog,
@@ -129,7 +121,7 @@ fun HomeScreen(
                 onBodyToggled = viewModel::toggleBodyFlag
             )
 
-            Spacer(Modifier.height(96.dp))
+            Spacer(Modifier.height(112.dp))
         }
     }
 
@@ -146,25 +138,38 @@ fun HomeScreen(
 }
 
 @Composable
-private fun DateHeader(today: LocalDate) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = "TODAY",
-            style = MaterialTheme.typography.labelMedium,
-            color = LunaCream.copy(alpha = 0.45f)
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = today.pretty(),
-            style = MaterialTheme.typography.titleLarge,
-            color = LunaCream
-        )
+private fun DateHeader(today: LocalDate, cycleDay: Int?, onOpenCalendar: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = today.pretty(),
+                style = MaterialTheme.typography.titleLarge,
+                color = LunaTextPrimary
+            )
+            if (cycleDay != null) {
+                Text(
+                    text = "Cycle day $cycleDay",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = LunaTextSecondary
+                )
+            }
+        }
+        IconButton(onClick = onOpenCalendar) {
+            Icon(
+                imageVector = Icons.Default.DateRange,
+                contentDescription = "Open calendar",
+                tint = LunaTextSecondary
+            )
+        }
     }
 }
 
 /**
- * Holds the donut's footprint before any period is logged, so the layout does not jump the
- * first time history appears.
+ * Holds the ring's footprint before any period is logged, so the layout does not jump the first
+ * time history appears.
  */
 @Composable
 private fun EmptyCycleRing() {
@@ -173,7 +178,7 @@ private fun EmptyCycleRing() {
             val stroke = 30.dp.toPx()
             val ringDiameter = size.minDimension - stroke
             drawArc(
-                color = LunaCream.copy(alpha = 0.07f),
+                color = LunaHairline,
                 startAngle = 0f,
                 sweepAngle = 360f,
                 useCenter = false,
@@ -185,55 +190,45 @@ private fun EmptyCycleRing() {
                 style = Stroke(width = stroke, cap = StrokeCap.Butt)
             )
         }
-        Text(
-            text = "Log your first period to get started",
-            style = MaterialTheme.typography.bodyLarge,
-            color = LunaCream.copy(alpha = 0.6f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(max = 170.dp)
-        )
-    }
-}
-
-@Composable
-private fun OverdueBanner(cycle: CycleState) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = LunaBlush.copy(alpha = 0.12f),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(
-            text = "Period overdue by ${cycle.overdueDays} " +
-                if (cycle.overdueDays == 1) "day" else "days",
-            style = MaterialTheme.typography.titleMedium,
-            color = LunaBlush,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp, horizontal = 16.dp)
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.widthIn(max = 180.dp)
+        ) {
+            Text(
+                text = "Nothing logged yet",
+                style = MaterialTheme.typography.titleLarge,
+                color = LunaTextPrimary,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Tap $LOG_PERIOD and the ring fills in.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = LunaTextSecondary,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
 @Composable
 private fun CycleFootnote(cycle: CycleState) {
     val text = if (cycle.isPersonalised) {
-        "Based on your history · ${cycle.cycleLength}-day cycle, " +
-            "${cycle.periodLength}-day period"
+        "Your recent cycles average ${cycle.cycleLength} days, " +
+            "with a ${cycle.periodLength}-day period."
     } else {
-        "Using ${cycle.cycleLength}/${cycle.periodLength} defaults " +
-            "until you log a few more cycles"
+        "Still learning. Using ${cycle.cycleLength}-day estimates until you log two cycles."
     }
     Text(
         text = text,
         style = MaterialTheme.typography.bodyMedium,
-        color = LunaCream.copy(alpha = 0.4f),
-        textAlign = TextAlign.Center,
+        color = LunaTextSecondary,
         modifier = Modifier.fillMaxWidth()
     )
 }
 
 private fun LocalDate.pretty(): String {
+    val weekday = dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }
     val monthName = month.name.lowercase().replaceFirstChar { it.uppercase() }
-    return "$dayOfMonth $monthName"
+    return "$weekday $dayOfMonth $monthName"
 }
