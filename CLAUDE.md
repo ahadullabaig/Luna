@@ -56,9 +56,11 @@ Milestones 1 (skeleton/theme), 2 (data layer), 3 (home screen) and 4 (calendar) 
 
 A **design pass** then went over both screens: the solid/hollow provenance rule was promoted from the calendar to the whole app, the two 40%-alpha phase colours became opaque constants, cream collapsed from nineteen alphas to five named roles, and the app gained real typography. Six measured defects were fixed along the way — see the Design system, Typography, Phase donut and Calendar sections, which carry the "do not undo this" notes. **The redesign has been verified by compiler and unit tests only; nobody has run it on a device or emulator yet.** Give the two screens a look before trusting the layout.
 
-**Milestone 5** is next: app icon, signing config, release APK. Note `app/build.gradle.kts` already references `proguard-rules.pro`, which does not exist — `assembleRelease` fails until M5 creates it. `res/` now exists (created for `res/font/`), so the icon has somewhere to go.
+**Milestone 5** is underway. `assembleRelease` now succeeds — it never had before, because `app/build.gradle.kts` referenced a `proguard-rules.pro` that did not exist. The launcher icon, the launch window and the signing config are in. What is left is the part only you can do: generate the keystore and write `keystore.properties` (see Release build below), then sideload.
 
-**Known debt, deliberately unaddressed:** `allowBackup="true"` in the manifest contradicts the local-only privacy claim; `fallbackToDestructiveMigration()` is still armed with `exportSchema = false`; `PeriodDao.getRecentPeriods()` and its `CycleRepository` passthrough are dead code (M3 reads full history as a `Flow` instead).
+**`allowBackup="true"` now matters.** It was harmless while the app only ran from Android Studio; a sideloaded release build means Android auto-backup can copy the Room database to the user's Google Drive, which is precisely what "local-only, no network" promises will not happen. Setting it to `false` is a one-line manifest change and is the first thing to do if that promise is meant literally.
+
+**Known debt, deliberately unaddressed:** `fallbackToDestructiveMigration()` is still armed with `exportSchema = false`; `PeriodDao.getRecentPeriods()` and its `CycleRepository` passthrough are dead code (M3 reads full history as a `Flow` instead).
 
 ---
 
@@ -168,6 +170,47 @@ The five-item legend is gone. The four colours are named on the home screen wher
 **`CycleProjection`** (`domain/usecase/CycleProjection.kt`) resolves the medians once and answers `infoFor(date)` per cell — a grid asks about 42 dates, and `computePhaseForDate` would redo the whole median derivation for each. It is a data class so Compose can skip recomposition when history has not changed; `computePhaseForDate` now delegates to it, so there is one implementation of the rule.
 
 `rememberCalendarState` is keyed on its month bounds via `rememberSaveable(inputs = …)`, so changing them **recreates** the state and resets the scroll. The bounds come from `CalendarUiState.rangeStart/rangeEnd`, which move only when today's month changes — a plain midnight rollover leaves the scroll position alone.
+
+---
+
+## Release build
+
+`./gradlew assembleRelease` works and produces `app/build/outputs/apk/release/app-release-unsigned.apk` (1.8MB, down from the 11MB debug APK). It is **unsigned** until you supply a keystore, and that is deliberate: `app/build.gradle.kts` reads signing details from `keystore.properties` at the repo root and only registers the `release` signing config when that file exists, so a fresh clone still builds rather than failing configuration on a missing secret.
+
+To sign it, one time:
+
+```bash
+keytool -genkey -v -keystore luna-release.jks -keyalg RSA \
+  -keysize 2048 -validity 10000 -alias luna
+```
+
+Then write `keystore.properties` (gitignored, alongside `*.jks` and `*.keystore`):
+
+```
+storeFile=luna-release.jks
+storePassword=...
+keyAlias=luna
+keyPassword=...
+```
+
+**Back the keystore up somewhere outside the repo.** Losing it means never being able to update an installed copy of Luna — Android will refuse an APK signed by a different key, and the only way out is uninstalling, which takes the database with it.
+
+**`proguard-rules.pro` holds exactly two rules, and both are load-bearing.** Everything else Luna depends on ships consumer rules inside its AAR, so do not add blanket `-keep class com.luna.app.**` rules — that turns `isMinifyEnabled` into a decoration.
+
+- **`FlowLevel` and `Energy` constants are pinned by name.** `data/Converters.kt` writes them into SQLite with `.name` and reads them back with `valueOf`, which makes the constant names part of the on-disk format. R8 renaming `HEAVY` would make every previously written row throw on read — a crash that appears only in release, only on a device with existing data.
+- **`@Serializable` objects keep `INSTANCE` and `serializer()`.** The navigation routes in `ui/nav/Routes.kt` are only ever reached reflectively, so R8 would otherwise strip them and the app would throw at the first `navigate()`.
+
+Both are verified against `app/build/outputs/mapping/release/mapping.txt`, which shows `HEAVY -> HEAVY` and `HomeRoute INSTANCE -> INSTANCE`. If you change either mechanism, re-check the mapping rather than assuming.
+
+## Launcher icon and launch window
+
+`res/mipmap-anydpi-v26/ic_launcher.xml` is an adaptive icon with a monochrome layer for Android 13 themed icons. `minSdk = 26` means every device that can install Luna supports adaptive icons, so there is no ladder of legacy density PNGs and there does not need to be one.
+
+The crescent in `res/drawable/ic_launcher_foreground.xml` is the region between two circular arcs, not one circle punched out of another. Subtracting a circle with `evenOdd` cannot work: the cutting circle has to reach outside the moon's edge to make a crescent at all, and every part of that overhang comes back filled.
+
+`res/values/themes.xml` exists for one line — `android:windowBackground`. The system paints that between the launcher tap and Compose's first frame, and inheriting `DeviceDefault` left it at the device default, so a dark-only app opened with a white flash on a phone in light mode. For the same reason `MainActivity` passes `SystemBarStyle.dark(...)` to `enableEdgeToEdge()` explicitly: the no-argument form picks system-bar icon colours from the device's light/dark setting, which put dark icons on Luna's navy and swallowed the clock.
+
+`res/values/colors.xml` duplicates two values from `ui/theme/Color.kt` because the system needs them as Android resources before any Compose code runs. Keep them in step by hand.
 
 ---
 
