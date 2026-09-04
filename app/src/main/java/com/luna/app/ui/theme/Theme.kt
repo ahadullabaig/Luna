@@ -16,7 +16,15 @@ private val DarkColorScheme = darkColorScheme(
     secondary = LunaSand,
     onSecondary = LunaDeepNavy,
     onBackground = LunaCream,
-    onSurface = LunaCream
+    onSurface = LunaCream,
+    // Anything Material lifts off the background — sheets, menus — lands on the raised navy
+    // rather than a wash of cream over the ground, which reads as grey dirt rather than depth.
+    surfaceContainer = LunaNavyRaised,
+    surfaceContainerHigh = LunaNavyRaised,
+    surfaceContainerHighest = LunaNavyRaised,
+    onSurfaceVariant = LunaTextSecondary,
+    outline = LunaOutline,
+    outlineVariant = LunaHairline
 )
 
 @Composable
