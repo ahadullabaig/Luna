@@ -60,7 +60,7 @@ A **design pass** then went over both screens: the solid/hollow provenance rule 
 
 **Backup is off, in both of the places Android keeps it.** `allowBackup="false"` opts out of cloud backup on every version Luna runs on. That used to be the whole story, but Android 12 split device-to-device transfer out into `android:dataExtractionRules`, which does not consult `allowBackup` — so setting up a new phone from an old one would have carried the Room database across a network the app claims never to touch. `res/xml/data_extraction_rules.xml` excludes every domain from both `<cloud-backup>` and `<device-transfer>`. This is the file that has to stay right for the local-only claim to be true; if you ever see it edited, that is the claim being edited.
 
-**Known debt, deliberately unaddressed:** `fallbackToDestructiveMigration()` is still armed with `exportSchema = false`; `PeriodDao.getRecentPeriods()` and its `CycleRepository` passthrough are dead code (M3 reads full history as a `Flow` instead).
+**Known debt, deliberately unaddressed:** `PeriodDao.getRecentPeriods()` and its `CycleRepository` passthrough are dead code (M3 reads full history as a `Flow` instead).
 
 ---
 
@@ -135,7 +135,13 @@ Tests are in `app/src/test/java/com/luna/app/` — 45 in total. 39 under `domain
 
 **TypeConverters** in `data/Converters.kt`: `LocalDate ↔ Long` (epoch days), `FlowLevel? ↔ String?`, `Energy? ↔ String?`. Room does **not** auto-convert enums — omitting these causes a runtime crash.
 
-**Migration strategy:** `fallbackToDestructiveMigration()` is active during development. When real data matters, bump `version` in `LunaDatabase` and write a proper `Migration` object.
+**Migrations: there is no destructive fallback, and do not put one back.** `fallbackToDestructiveMigration()` was removed once the app became something that could be installed on another person's phone. With it, bumping `version` without writing a `Migration` deletes the database and rebuilds it empty — silently, on a successful install, with no crash to notice. Luna has no export and `allowBackup` is false, so nothing recovers from that. Without it, the same mistake throws `IllegalStateException` on the developer's own phone, which is a bug you can fix.
+
+**Schemas are exported to `app/schemas/` and committed.** `exportSchema = true`, with the directory set by `ksp { arg("room.schemaLocation", ...) }` in `app/build.gradle.kts`. The JSON is the only record of what version N's tables looked like; without it a migration to N+1 is written from memory. `app/schemas/com.luna.app.data.LunaDatabase/1.json` is the baseline — the schema of every copy of Luna installed so far.
+
+**To change the schema:** bump `version` in `LunaDatabase`, add a `Migration` in `AppModule`, build (KSP writes the new JSON), and commit that JSON with the change. Never edit an already-committed schema file — it describes what is on someone's phone, not what you wish were there.
+
+**Updating an installed copy without losing data** needs three things, all independent: the same signing key (a different one makes Android refuse the install outright), a higher `versionCode` in `app/build.gradle.kts`, and a real migration for any schema change. Getting the first two right and the third wrong is the failure mode that looks like success.
 
 ---
 
