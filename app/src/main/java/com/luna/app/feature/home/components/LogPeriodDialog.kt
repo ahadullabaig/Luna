@@ -22,7 +22,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.luna.app.ui.theme.LunaBlush
-import com.luna.app.ui.theme.LunaCream
+import com.luna.app.ui.theme.LunaTextFaint
+import com.luna.app.ui.theme.LunaTextPrimary
+import com.luna.app.ui.theme.LunaTextSecondary
 import com.luna.app.ui.theme.LunaDeepNavy
 import kotlinx.datetime.LocalDate
 
@@ -64,7 +66,7 @@ fun LogPeriodDialog(
                     title = { Text("Log a period") },
                     navigationIcon = {
                         TextButton(onClick = onDismiss) {
-                            Text("Cancel", color = LunaCream.copy(alpha = 0.7f))
+                            Text("Cancel", color = LunaTextSecondary)
                         }
                     },
                     actions = {
@@ -77,17 +79,13 @@ fun LogPeriodDialog(
                         ) {
                             Text(
                                 text = "Save",
-                                color = if (startMillis != null) {
-                                    LunaBlush
-                                } else {
-                                    LunaCream.copy(alpha = 0.3f)
-                                }
+                                color = if (startMillis != null) LunaBlush else LunaTextFaint
                             )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = LunaDeepNavy,
-                        titleContentColor = LunaCream
+                        titleContentColor = LunaTextPrimary
                     )
                 )
 
@@ -95,7 +93,7 @@ fun LogPeriodDialog(
                     text = "Pick the first day. Tap a second day to set the end, " +
                         "or save with just one if your period is still going.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = LunaCream.copy(alpha = 0.55f),
+                    color = LunaTextSecondary,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
                 )
 
@@ -106,16 +104,20 @@ fun LogPeriodDialog(
                     showModeToggle = false,
                     colors = DatePickerDefaults.colors(
                         containerColor = LunaDeepNavy,
-                        titleContentColor = LunaCream,
-                        headlineContentColor = LunaCream,
-                        weekdayContentColor = LunaCream.copy(alpha = 0.55f),
-                        subheadContentColor = LunaCream.copy(alpha = 0.75f),
-                        dayContentColor = LunaCream,
+                        titleContentColor = LunaTextPrimary,
+                        headlineContentColor = LunaTextPrimary,
+                        weekdayContentColor = LunaTextSecondary,
+                        subheadContentColor = LunaTextSecondary,
+                        dayContentColor = LunaTextPrimary,
                         selectedDayContentColor = LunaDeepNavy,
                         selectedDayContainerColor = LunaBlush,
                         todayContentColor = LunaBlush,
                         todayDateBorderColor = LunaBlush,
-                        dayInSelectionRangeContentColor = LunaDeepNavy,
+                        // The two endpoints are solid blush and take navy. The days between them
+                        // are a wash of the same colour, which navy cannot be read on at all
+                        // (2.21:1) — cream clears it at 8.07:1, and the endpoints stay distinct
+                        // because they are the only solid ones.
+                        dayInSelectionRangeContentColor = LunaTextPrimary,
                         dayInSelectionRangeContainerColor = LunaBlush.copy(alpha = 0.35f)
                     )
                 )
