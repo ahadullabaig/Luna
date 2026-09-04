@@ -193,7 +193,7 @@ data class CycleState(
 
 where `ovulationDay = cycleLength - 14`. The luteal phase (ovulation → next period) is relatively fixed at ~14 days for most people; it's the follicular phase that varies. Anchoring ovulation to 14 days before the next predicted period gives accurate results for any cycle length, not just 28-day cycles. For example: a 32-day cycle puts ovulation at day 18, not day 16.
 
-**Averaging logic:** `cycleLength` = median gap between consecutive `PeriodEntity.startDate`s over the last 6 cycles. `periodLength` = median of `endDate - startDate` over the last 6 completed cycles — exclude any row where `endDate` is null (period still ongoing), since its true length is unknown; if the in-progress period is the only one logged, fall back to the default. If fewer than 2 completed cycles are available, fall back to 28 / 5.
+**Averaging logic:** `cycleLength` = median gap between consecutive `PeriodEntity.startDate`s over the last 6 cycles. `periodLength` = median of `startDate.daysUntil(endDate) + 1` over the last 6 completed cycles — inclusive of both endpoints, so a period that starts and ends on the same day is 1 day, not 0 — exclude any row where `endDate` is null (period still ongoing), since its true length is unknown; if the in-progress period is the only one logged, fall back to the default. If fewer than 2 completed cycles are available, fall back to 28 / 5.
 
 **Edge cases to handle explicitly:**
 - No periods logged yet → show empty state ("Log your first period to get started"), not a donut.
@@ -343,34 +343,40 @@ ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 
 Ship in five small PRs-to-self. Each milestone produces a runnable app; never let the project sit broken.
 
-**Milestone 1 — Skeleton & theme (half a day).**
+**All five shipped.** This section is kept as written, as the plan of record. Where the code and this document disagree, the code is right and `CLAUDE.md` says why — that file is the maintained one.
+
+**Milestone 1 — Skeleton & theme (half a day).** ✅
 New project, Compose + Material 3 + Hilt wired up, `LunaTheme` renders a `Scaffold` with the navy background and a "Hello Luna" centered in cream. NavHost set up with two empty routes. Goal: verify the theme looks right on a real device.
 
-**Milestone 2 — Data layer (half a day).**
+**Milestone 2 — Data layer (half a day).** ✅
 Room database, both entities, both DAOs, TypeConverter for `LocalDate`, repository class, Hilt module. Write a tiny debug button that inserts a fake period and reads it back into a log. Zero UI polish.
 
-**Milestone 3 — Home screen (1–2 days).**
+**Milestone 3 — Home screen (1–2 days).** ✅
 Phase donut Canvas, phase calculation use case, symptom chips wired to `DailyLogEntity`. Log-a-period flow: a floating action button that opens a date picker and inserts a `PeriodEntity`. At the end of this milestone, the app is functionally useful to you.
 
-**Milestone 4 — Calendar screen (1 day).**
+**Milestone 4 — Calendar screen (1 day).** ✅
 Integrate `kizitonwose/Calendar`, custom `PhaseDayCell`, month navigation, phase projection for future months. Optional: tap-a-day detail sheet.
 
-**Milestone 5 — Polish + signed APK (half a day).**
+**Milestone 5 — Polish + signed APK (half a day).** ✅
 Empty states, app icon, animations on phase transitions. Generate signing key, configure release build, produce the APK, sideload. Done.
 
 Total: roughly 4–5 focused days of work.
+
+A design pass over the home and calendar screens followed M4, and is not in this plan — see `CLAUDE.md`. It replaced the phase donut's marker dot with a solid/hairline split at today, made the two muted phase colours opaque, and cut the cream ramp from nineteen alphas to five named roles.
 
 ---
 
 ## 11. Building the APK
 
-Once Milestone 5 code is ready:
+Milestone 5 is done, so this is now a description of what exists rather than a to-do. The `signingConfigs` block described below is already in `app/build.gradle.kts`.
 
 **Generate a signing keystore** (one-time, keep this file safe — back it up outside the repo):
 ```bash
-keytool -genkey -v -keystore luna-release.jks -keyalg RSA \
-  -keysize 2048 -validity 10000 -alias luna
+keytool -genkeypair -v -keystore luna-release.jks -alias luna \
+  -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Luna"
 ```
+
+(`-dname` supplies the certificate subject up front. Without it keytool prompts for your name, organisation and location, and the answers are embedded in the APK where anyone holding the file can read them.)
 
 **Configure `app/build.gradle.kts`** with a `signingConfigs` block reading from a local `keystore.properties` file (gitignored). Wire it into the `release` `buildType`. Enable `minifyEnabled = true` and `isShrinkResources = true` for the release build — free size win.
 
