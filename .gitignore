@@ -17,3 +17,5 @@ build_out.txt
 # Signing key material — never commit these.
 *.jks
 *.keystore
+*.jks.*
+*.keystore.*

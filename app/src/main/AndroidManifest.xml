@@ -1,10 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+      tools:ignore="DataExtractionRules" — lint asks for android:fullBackupContent as well,
+      because dataExtractionRules only applies from Android 12 and minSdk is 26. That advice
+      assumes allowBackup is true. It is false, which disables backup outright below
+      Android 12, so fullBackupContent would never be read. A rules file that is never
+      consulted is worse than none: it looks like the thing protecting the data.
+    -->
     <application
         android:name=".LunaApp"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        tools:ignore="DataExtractionRules"
         android:icon="@mipmap/ic_launcher"
         android:label="Luna"
         android:supportsRtl="true"
