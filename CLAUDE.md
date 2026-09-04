@@ -50,17 +50,55 @@ Single `app` module. MVVM. Package layout by feature, not by layer.
 
 ---
 
-## Current milestone status
+## Current status
 
-Milestones 1 (skeleton/theme), 2 (data layer), 3 (home screen) and 4 (calendar) are complete. The M2 debug scaffolding — the period counter and "Insert Fake Period" button — is gone, replaced by the real home screen, and the calendar is reachable from the date icon beside the home header.
+**All five milestones are complete.** Luna builds, signs and installs; there is no next milestone. Milestones 1 (skeleton/theme), 2 (data layer), 3 (home screen), 4 (calendar) and 5 (polish + signed APK) are all done. The M2 debug scaffolding — the period counter and "Insert Fake Period" button — is gone, replaced by the real home screen, and the calendar is reachable from the date icon beside the home header.
 
 A **design pass** then went over both screens: the solid/hollow provenance rule was promoted from the calendar to the whole app, the two 40%-alpha phase colours became opaque constants, cream collapsed from nineteen alphas to five named roles, and the app gained real typography. Six measured defects were fixed along the way — see the Design system, Typography, Phase donut and Calendar sections, which carry the "do not undo this" notes. **The redesign has been verified by compiler and unit tests only; nobody has run it on a device or emulator yet.** Give the two screens a look before trusting the layout.
 
-**Milestone 5** is underway. `assembleRelease` now succeeds — it never had before, because `app/build.gradle.kts` referenced a `proguard-rules.pro` that did not exist. The launcher icon, the launch window and the signing config are in. What is left is the part only you can do: generate the keystore and write `keystore.properties` (see Release build below), then sideload.
+**Milestone 5** delivered `proguard-rules.pro` (referenced since M1 but never written, so `assembleRelease` had never once succeeded), an adaptive launcher icon, a navy launch window, and a signing config. The signed APK is 1.8MB against the debug build's 11MB.
 
 **Backup is off, in both of the places Android keeps it.** `allowBackup="false"` opts out of cloud backup on every version Luna runs on. That used to be the whole story, but Android 12 split device-to-device transfer out into `android:dataExtractionRules`, which does not consult `allowBackup` — so setting up a new phone from an old one would have carried the Room database across a network the app claims never to touch. `res/xml/data_extraction_rules.xml` excludes every domain from both `<cloud-backup>` and `<device-transfer>`. This is the file that has to stay right for the local-only claim to be true; if you ever see it edited, that is the claim being edited.
 
 **Known debt, deliberately unaddressed:** `fallbackToDestructiveMigration()` is still armed with `exportSchema = false`; `PeriodDao.getRecentPeriods()` and its `CycleRepository` passthrough are dead code (M3 reads full history as a `Flow` instead).
+
+---
+
+## Verifying your work
+
+**There is no emulator on this machine.** The user has said so twice; a headless boot with `-memory 2048` still failed to reach `sys.boot_completed`. Do not start one. If you ever do start one, kill `qemu-system-x86_64`, `netsimd` and the adb server afterwards.
+
+So "verified" here means exactly three things, and you should say which of them you did rather than implying more:
+
+```bash
+./gradlew assembleDebug assembleRelease   # compiles, and R8 runs
+./gradlew test                            # 45 tests, 0 failures
+./gradlew lint                            # baseline is 22 warnings
+```
+
+The lint baseline is **22 warnings**, all pre-existing dependency-freshness notices (`GradleDependency`, `NewerVersionAvailable`, `AndroidGradlePluginVersion`, `OldTargetApi`). If you see 23, you added one — look at it rather than assuming it is noise. Two of the four M5 warnings turned out to be real.
+
+For anything that renders, arithmetic is the only tool available and it is weakest exactly where type metrics and rounded-corner composition are involved. Say plainly that it has not been seen running, and name what you would want eyes on. Never write "verified" for a layout.
+
+Claims about the built artifact can be checked without a device, and should be:
+
+```bash
+AAPT=~/Android/Sdk/build-tools/37.0.0/aapt2
+APK=app/build/outputs/apk/release/app-release.apk
+$AAPT dump badging $APK                     # icon wiring, sdk levels, label
+$AAPT dump xmltree $APK --file AndroidManifest.xml   # allowBackup, extraction rules
+~/Android/Sdk/build-tools/37.0.0/apksigner verify --print-certs $APK
+grep -A8 '^com\.luna\.app\.domain\.model\.FlowLevel ->' \
+  app/build/outputs/mapping/release/mapping.txt      # did R8 keep the enum names
+```
+
+---
+
+## Working in this repo
+
+**Stage files by name. Do not use `git add -A` or `git add .`.** It has gone wrong twice: once sweeping unrelated work into a commit whose message described only half of it, and once committing `luna-release.jks.old` — a real signing keystore — because `.gitignore` said `*.jks`, which does not match a file renamed to `.jks.old`. Anything with a `.old`, `.bak` or `.orig` suffix created mid-migration is precisely what a glob misses.
+
+**No `Co-Authored-By` or `Claude-Session` trailers in commit messages.** The user has removed them by hand once and asked that they stop. Write the subject and body and stop.
 
 ---
 
@@ -76,7 +114,7 @@ A **design pass** then went over both screens: the solid/hollow provenance rule 
 
 **Averaging:** `cycleLength` = median gap over last 6 periods. `periodLength` = median over last 6 *completed* periods (exclude rows where `endDate` is null). Fall back to 28/5 if fewer than 2 completed cycles.
 
-Period length is **inclusive of both endpoints** — `startDate.daysUntil(endDate) + 1`, so a period that starts and ends on the same day is 1 day, not 0. PLAN.md §6 writes this as `endDate - startDate` and is off by one; the code is correct, the doc is not.
+Period length is **inclusive of both endpoints** — `startDate.daysUntil(endDate) + 1`, so a period that starts and ends on the same day is 1 day, not 0. PLAN.md §6 used to write this as `endDate - startDate`, which is off by one; that has been corrected in the plan, but the general rule still holds — where PLAN.md and the code disagree, the code is right.
 
 **Edge cases that must be handled explicitly:**
 - No periods logged → empty state ("Nothing logged yet" / "Tap Log a period and the ring fills in."), not a donut.
@@ -175,16 +213,18 @@ The five-item legend is gone. The four colours are named on the home screen wher
 
 ## Release build
 
-`./gradlew assembleRelease` works and produces `app/build/outputs/apk/release/app-release-unsigned.apk` (1.8MB, down from the 11MB debug APK). It is **unsigned** until you supply a keystore, and that is deliberate: `app/build.gradle.kts` reads signing details from `keystore.properties` at the repo root and only registers the `release` signing config when that file exists, so a fresh clone still builds rather than failing configuration on a missing secret.
+`./gradlew assembleRelease` produces `app/build/outputs/apk/release/app-release.apk` (1.8MB, down from the 11MB debug APK). **The filename tells you whether signing worked**: with a keystore configured you get `app-release.apk`, without one `app-release-unsigned.apk`. A keystore is already configured on the user's machine, so a `-unsigned` suffix appearing again means `keystore.properties` went missing, not that the build changed. That fallback is deliberate: `app/build.gradle.kts` reads signing details from `keystore.properties` at the repo root and only registers the `release` signing config when that file exists, so a fresh clone still builds rather than failing configuration on a missing secret.
 
 To sign it, one time:
 
 ```bash
-keytool -genkey -v -keystore luna-release.jks -keyalg RSA \
-  -keysize 2048 -validity 10000 -alias luna
+keytool -genkeypair -v -keystore luna-release.jks -alias luna \
+  -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Luna"
 ```
 
-Then write `keystore.properties` (gitignored, alongside `*.jks` and `*.keystore`):
+`-genkeypair` is the current spelling (`-genkey` is the deprecated alias and still works). `-dname` matters for more than convenience: without it keytool prompts for name, organisation and location, and whatever is typed is embedded in the certificate and readable out of the APK by anyone holding the file. On a privacy app that is worth a thought. On JDK 9+ the keystore is PKCS12 regardless of the `.jks` extension, and PKCS12 requires the key password and store password to be identical — keytool will not offer a separate one.
+
+Then write `keystore.properties` (gitignored, as are `*.jks`, `*.jks.*`, `*.keystore` and `*.keystore.*` — the doubled patterns exist because a keystore renamed to `.jks.old` during a key swap slipped past the bare `*.jks`):
 
 ```
 storeFile=luna-release.jks
@@ -204,13 +244,17 @@ Both are verified against `app/build/outputs/mapping/release/mapping.txt`, which
 
 ## Launcher icon and launch window
 
-`res/mipmap-anydpi-v26/ic_launcher.xml` is an adaptive icon with a monochrome layer for Android 13 themed icons. `minSdk = 26` means every device that can install Luna supports adaptive icons, so there is no ladder of legacy density PNGs and there does not need to be one.
+`res/mipmap-anydpi/ic_launcher.xml` is an adaptive icon with a monochrome layer for Android 13 themed icons. `minSdk = 26` means every device that can install Luna supports adaptive icons, so there is no ladder of legacy density PNGs and there does not need to be one — and no `-v26` qualifier on the folder either, which is redundant at this `minSdk` and which lint flags as `ObsoleteSdkInt`.
+
+**Renaming a resource folder needs `./gradlew clean`.** AGP's incremental resource merger sees the move as a delete plus an add and fails `processDebugResources` with `resource mipmap/ic_launcher not found` — pointing at the manifest, which is not where the problem is. The build is fine; the merge state is stale.
 
 The crescent in `res/drawable/ic_launcher_foreground.xml` is the region between two circular arcs, not one circle punched out of another. Subtracting a circle with `evenOdd` cannot work: the cutting circle has to reach outside the moon's edge to make a crescent at all, and every part of that overhang comes back filled.
 
 `res/values/themes.xml` exists for one line — `android:windowBackground`. The system paints that between the launcher tap and Compose's first frame, and inheriting `DeviceDefault` left it at the device default, so a dark-only app opened with a white flash on a phone in light mode. For the same reason `MainActivity` passes `SystemBarStyle.dark(...)` to `enableEdgeToEdge()` explicitly: the no-argument form picks system-bar icon colours from the device's light/dark setting, which put dark icons on Luna's navy and swallowed the clock.
 
 `res/values/colors.xml` duplicates two values from `ui/theme/Color.kt` because the system needs them as Android resources before any Compose code runs. Keep them in step by hand.
+
+**The manifest carries one lint suppression, `tools:ignore="DataExtractionRules"`, and it is reasoned rather than lazy.** Lint asks for `android:fullBackupContent` alongside `android:dataExtractionRules`, because the latter only applies from Android 12 while `minSdk` is 26. That advice assumes `allowBackup` is true. It is false, which disables backup outright below Android 12, so `fullBackupContent` would never be read. Adding one would be worse than adding nothing: a rules file that nothing consults still looks, to the next reader, like the thing protecting the data.
 
 ---
 
