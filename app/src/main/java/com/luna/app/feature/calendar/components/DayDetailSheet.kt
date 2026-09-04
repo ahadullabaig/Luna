@@ -1,6 +1,7 @@
 package com.luna.app.feature.calendar.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -21,11 +23,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.luna.app.data.entity.DailyLogEntity
+import com.luna.app.domain.model.CyclePhase
 import com.luna.app.domain.model.DayInfo
 import com.luna.app.ui.common.loggedSymptoms
 import com.luna.app.ui.theme.LunaBlush
 import com.luna.app.ui.theme.LunaCream
-import com.luna.app.ui.theme.LunaDeepNavy
+import com.luna.app.ui.theme.LunaNavyRaised
+import com.luna.app.ui.theme.LunaTextPrimary
+import com.luna.app.ui.theme.LunaTextSecondary
 import com.luna.app.ui.theme.color
 import com.luna.app.ui.theme.label
 import kotlinx.datetime.LocalDate
@@ -46,7 +51,7 @@ fun DayDetailSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = LunaDeepNavy,
+        containerColor = LunaNavyRaised,
         contentColor = LunaCream
     ) {
         Column(
@@ -56,15 +61,15 @@ fun DayDetailSheet(
                 .padding(bottom = 32.dp)
         ) {
             Text(
-                text = if (isToday) "TODAY" else date.weekdayName().uppercase(),
+                text = if (isToday) "Today" else date.weekdayName(),
                 style = MaterialTheme.typography.labelMedium,
-                color = LunaCream.copy(alpha = 0.45f)
+                color = LunaTextSecondary
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 text = date.pretty(),
                 style = MaterialTheme.typography.titleLarge,
-                color = LunaCream
+                color = LunaTextPrimary
             )
 
             Spacer(Modifier.height(20.dp))
@@ -72,36 +77,50 @@ fun DayDetailSheet(
             val phase = info.phase
             if (phase == null) {
                 Text(
-                    text = "Before your logged history — nothing to place this day against.",
+                    text = "This day is before anything you have logged, so there is nothing to " +
+                        "place it against.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = LunaCream.copy(alpha = 0.5f)
+                    color = LunaTextSecondary
                 )
             } else {
+                val expectedPeriod = phase == CyclePhase.MENSTRUAL && !info.isLoggedPeriod
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(10.dp)
+                            .size(12.dp)
                             .clip(CircleShape)
-                            .background(phase.color)
+                            // Same grammar as the grid: filled is recorded, outlined is expected.
+                            .then(
+                                if (expectedPeriod) {
+                                    Modifier.border(1.5.dp, phase.color, CircleShape)
+                                } else {
+                                    Modifier.background(phase.color)
+                                }
+                            )
                     )
-                    Spacer(Modifier.size(10.dp))
+                    Spacer(Modifier.width(10.dp))
                     Text(
                         text = phase.label,
                         style = MaterialTheme.typography.titleMedium,
-                        color = LunaCream
+                        color = LunaTextPrimary
                     )
-                    info.cycleDay?.let { day ->
-                        Text(
-                            text = "  ·  Day $day",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = LunaCream.copy(alpha = 0.5f)
-                        )
-                    }
                 }
-                if (info.isLoggedPeriod) {
+                info.cycleDay?.let { day ->
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "Day $day of your cycle",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = LunaTextSecondary
+                    )
+                }
+                if (phase == CyclePhase.MENSTRUAL) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "Period logged",
+                        text = if (info.isLoggedPeriod) {
+                            "Period logged"
+                        } else {
+                            "Period expected, not logged yet"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = LunaBlush
                     )
@@ -115,21 +134,21 @@ fun DayDetailSheet(
                 Text(
                     text = "No symptoms logged.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = LunaCream.copy(alpha = 0.4f)
+                    color = LunaTextSecondary
                 )
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     groups.forEach { (title, values) ->
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(
-                                text = title.uppercase(),
+                                text = title,
                                 style = MaterialTheme.typography.labelMedium,
-                                color = LunaCream.copy(alpha = 0.45f)
+                                color = LunaTextSecondary
                             )
                             Text(
-                                text = values.joinToString(" · "),
+                                text = values.joinToString(", "),
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = LunaCream.copy(alpha = 0.85f)
+                                color = LunaTextPrimary
                             )
                         }
                     }
