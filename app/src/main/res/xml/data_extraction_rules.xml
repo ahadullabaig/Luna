@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12 split what allowBackup used to cover. allowBackup="false" still opts out of
+  cloud backup on every version Luna runs on, but device-to-device transfer is governed
+  here and does not consult it — so without this file, setting up a new phone from an old
+  one would carry the database across a network Luna claims never to touch.
+
+  Every domain is excluded explicitly rather than relying on `root` to imply the rest.
+  This is the file that has to stay right for the local-only claim to be true, so it says
+  what it means instead of being clever.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_file" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_file" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+    </device-transfer>
+</data-extraction-rules>
