@@ -105,4 +105,11 @@ dependencies {
     testImplementation(libs.junit)
 }
 
+// Room writes a JSON snapshot of the schema per version here, and app/schemas/ is committed.
+// It is the only record of what an earlier version's tables looked like, and therefore the
+// only way to write a migration to the next one that is correct rather than remembered.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 kotlin { jvmToolchain(21) }
