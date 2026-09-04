@@ -54,7 +54,9 @@ Single `app` module. MVVM. Package layout by feature, not by layer.
 
 Milestones 1 (skeleton/theme), 2 (data layer), 3 (home screen) and 4 (calendar) are complete. The M2 debug scaffolding — the period counter and "Insert Fake Period" button — is gone, replaced by the real home screen, and the calendar is reachable from the date icon beside the home header.
 
-**Milestone 5** is next: Empty states, app icon, signing config, release APK. Note `app/build.gradle.kts` already references `proguard-rules.pro`, which does not exist — `assembleRelease` fails until M5 creates it.
+A **design pass** then went over both screens: the solid/hollow provenance rule was promoted from the calendar to the whole app, the two 40%-alpha phase colours became opaque constants, cream collapsed from nineteen alphas to five named roles, and the app gained real typography. Six measured defects were fixed along the way — see the Design system, Typography, Phase donut and Calendar sections, which carry the "do not undo this" notes. **The redesign has been verified by compiler and unit tests only; nobody has run it on a device or emulator yet.** Give the two screens a look before trusting the layout.
+
+**Milestone 5** is next: app icon, signing config, release APK. Note `app/build.gradle.kts` already references `proguard-rules.pro`, which does not exist — `assembleRelease` fails until M5 creates it. `res/` now exists (created for `res/font/`), so the icon has somewhere to go.
 
 **Known debt, deliberately unaddressed:** `allowBackup="true"` in the manifest contradicts the local-only privacy claim; `fallbackToDestructiveMigration()` is still armed with `exportSchema = false`; `PeriodDao.getRecentPeriods()` and its `CycleRepository` passthrough are dead code (M3 reads full history as a `Flow` instead).
 
@@ -75,13 +77,13 @@ Milestones 1 (skeleton/theme), 2 (data layer), 3 (home screen) and 4 (calendar) 
 Period length is **inclusive of both endpoints** — `startDate.daysUntil(endDate) + 1`, so a period that starts and ends on the same day is 1 day, not 0. PLAN.md §6 writes this as `endDate - startDate` and is off by one; the code is correct, the doc is not.
 
 **Edge cases that must be handled explicitly:**
-- No periods logged → empty state ("Log your first period to get started"), not a donut.
+- No periods logged → empty state ("Nothing logged yet" / "Tap Log a period and the ring fills in."), not a donut.
 - Today is inside a logged period → phase is MENSTRUAL regardless of calculation.
-- Today is past `nextPeriodStart` + 3-day grace → "Period overdue by X days" state.
+- Today is past `nextPeriodStart` + 3-day grace → overdue. This is stated **once**, by the ring's centre number turning blush and reading "N days late". There was briefly a separate `OverdueBanner` above the donut saying the same thing 20dp away; do not reintroduce it.
 
 **Where this lives:** the pure functions are top-level in `domain/usecase/CycleMath.kt` — `computeCycleState(periods, today)` and `computePhaseForDate(date, periods)` are the entry points, and they take plain lists, not a repository. `GetCurrentCycleState` and `GetPhaseForDate` are thin `Flow` wrappers over `CycleRepository` that delegate to them. Keep new cycle logic in `CycleMath.kt`: the split is what makes it testable without mocking Room.
 
-Tests are in `app/src/test/java/com/luna/app/domain/usecase/` — 26 covering the medians, every phase boundary day-by-day, the three edge cases above, and the invariant that `phaseSegments()` always sums to `cycleLength`.
+Tests are in `app/src/test/java/com/luna/app/` — 45 in total. 39 under `domain/usecase/` cover the medians, every phase boundary day-by-day, the three edge cases above, and the invariant that `phaseSegments()` always sums to `cycleLength`. The other 6 are `feature/home/components/HeroReadingTest` — `heroReading()` is pure and picks which number the ring shows, so it is testable without Compose and worth testing. That is the only exception to "tests are for `domain/usecase/` only": still no Composable tests.
 
 ---
 
@@ -99,36 +101,69 @@ Tests are in `app/src/test/java/com/luna/app/domain/usecase/` — 26 covering th
 
 ## Design system
 
-Dark-only theme (`darkColorScheme`). Four palette constants in `ui/theme/Color.kt`:
+Dark-only theme (`darkColorScheme`). Palette constants in `ui/theme/Color.kt`. Ratios are WCAG 2.1 against `LunaDeepNavy`:
 
-| Constant | Hex | Role |
-|---|---|---|
-| `LunaDeepNavy` | `#070E36` | background, surface |
-| `LunaBlush` | `#FAA7C7` | primary, menstrual phase |
-| `LunaSand` | `#F7E0A1` | secondary, ovulation phase |
-| `LunaCream` | `#FCFAF0` | text, onBackground |
+| Constant | Hex | Role | On navy |
+|---|---|---|---|
+| `LunaDeepNavy` | `#070E36` | background, surface | — |
+| `LunaNavyRaised` | `#0D1746` | sheets, chips — anything above the ground | — |
+| `LunaBlush` | `#FAA7C7` | primary, menstrual phase | 10.15:1 |
+| `LunaBlushMuted` | `#8E5C77` | follicular phase | 3.51:1 |
+| `LunaSand` | `#F7E0A1` | secondary, ovulation phase | 14.34:1 |
+| `LunaSandMuted` | `#80723F` | luteal phase | 3.91:1 |
+| `LunaCream` | `#FCFAF0` | text, onBackground | 17.84:1 |
 
-**Phase → color mapping** (used by donut and calendar day cells):
-- Menstrual → `LunaBlush`
-- Follicular → `LunaBlush` at 40% alpha
-- Ovulation → `LunaSand`
-- Luteal → `LunaSand` at 40% alpha
+**The muted phases are opaque, and must stay that way.** They were `LunaBlush.copy(alpha = 0.4f)` and `LunaSand.copy(alpha = 0.4f)`, which is not what reached the screen: composited over the navy those land on `#684B70` and `#676261` — a muddy plum and a flat warm grey — and the first measures 2.51:1, under the 3:1 WCAG 1.4.11 asks of a graphical object. Between them they are 20 days of a 28-day cycle. Declaring them opaque is what lets them be tuned against the ground they actually sit on.
+
+**Cream comes in three steps and two edges, and nothing else.** It used to appear at nineteen different alphas, several of them indistinguishable — .40, .45 and .50 span 3.6:1 to 5.0:1 and read as one colour. Pick a role, never a number:
+
+| Token | Alpha | Use | On navy |
+|---|---|---|---|
+| `LunaTextPrimary` | 1.0 | what you read | 17.84:1 |
+| `LunaTextSecondary` | .62 | support | 7.18:1 |
+| `LunaTextFaint` | .40 | inert only — **never body copy** | 3.61:1 |
+| `LunaOutline` | .22 | bounds something pressable | — |
+| `LunaHairline` | .10 | divides content you cannot press | — |
+
+`LunaTextFaint` at 14sp would fail AA for normal text, which is exactly why it is fenced off to inert things (adjacent-month numbers, a disabled control).
+
+**Phase → color mapping** (used by donut and calendar day cells) lives in `ui/theme/PhaseColor.kt` as `CyclePhase.color`, with `onColor` for readable text on a filled swatch and `adjacentColor` (45% alpha) for a neighbouring month's days. Alpha is right for `adjacentColor` and wrong for the phases themselves: there the intent really is "this exact phase, but subordinate".
+
+---
+
+## Typography
+
+Two bundled families in `res/font/`, wired up in `ui/theme/Type.kt`. **Instrument Serif** (one weight) for `displayLarge` / `headlineMedium` / `headlineSmall` / `titleLarge`; **IBM Plex Sans** (400/500/600) for everything you operate. Bundled as TTFs rather than pulled through the downloadable-fonts provider, which would put a Play Services round trip behind an app whose whole premise is that it never talks to anything. ~676KB total.
+
+The scale used to be 24 / 22 / 16 / 16 / 14 / 14 / 12 / 11 in a single family — nearly flat, no display size. That flatness was why the home screen had no hierarchy to fix by rearranging: nothing was big enough to lead with. `displayLarge` (54sp serif) is the answer and appears **exactly once per screen**. `labelMedium` has lost its 1.2sp tracking along with the ALL-CAPS eyebrows it was cut for — labels are sentence case now.
 
 ---
 
 ## Phase donut (built — `feature/home/components/PhaseDonut.kt`)
 
-Custom Compose `Canvas` — do not reach for a chart library. The donut is `drawArc` calls (one per phase) plus a filled-circle marker for the current day. Start angle is `-90f` (12 o'clock). Sweep per phase = `(phaseDays / cycleLength) * 360f`. Center text ("Follicular / Day 8 / 12 days until period") goes in a `Box` wrapping the `Canvas` with `Alignment.Center`.
+Custom Compose `Canvas` — do not reach for a chart library. Start angle is `-90f` (12 o'clock). It draws from `phaseSegments()` rather than one arc per phase — a short cycle can drop a phase entirely, and run-length encoding day 1..`cycleLength` guarantees the sweeps sum to 360° in every case. Segments are separated by a `1.6f` degree gap, and the ring animates in once over 900ms.
 
-As built, it draws from `phaseSegments()` rather than one arc per phase — a short cycle can drop a phase entirely, and run-length encoding day 1..`cycleLength` guarantees the sweeps sum to 360° in every case. Segments are separated by a `1.6f` degree gap over a 6%-alpha track ring, and the sweep animates in once over 900ms.
+**Every phase is drawn twice, split at the current cycle day: solid behind you, hairline ahead.** This is the app's central rule — *solid is what happened, hairline is what Luna expects* — and it is the same distinction the calendar draws between a logged period day and an expected one. One rule, both screens.
+
+The ring used to be four equal-weight arcs with a cream dot marking today, which made it a chart of proportions: it said how long each phase is, but not where you are without hunting for the dot. Splitting at `cycleDay` turns the same drawing into a reading, and the boundary between solid and hairline *is* the marker — so the dot is gone, along with the neutral track ring behind it.
+
+`drawRevealedArc()` takes degrees measured from `START_ANGLE` and clips them to how far the reveal animation has got, which is what keeps the two-arcs-per-phase split from needing its own animation bookkeeping.
+
+**The centre number switches meaning with context** (`heroReading()`, pure and unit-tested). Counting down to the next period is the useful answer most of the time, but during a period it is a non-answer — what you want then is which day of it you are on. Overdue outranks both and turns the number blush. `daysUntilNextPeriod` of 0 or less reads "Due / today" or "Due / any day now" rather than rendering a bare `0` or a negative.
 
 ---
 
 ## Calendar screen (built — `feature/calendar/`)
 
-Uses `com.kizitonwose.calendar:compose` 2.6.1, which is the **java.time** flavour — `CalendarDay.date` is a `java.time.LocalDate` and `rememberCalendarState` takes `java.time.YearMonth`, while the rest of the app speaks `kotlinx.datetime`. Convert at the boundary with `toKotlinLocalDate()` / `toJavaLocalDate()`; `minSdk = 26` means no desugaring is needed. Only core Material icons are on the classpath, so there is no `ChevronLeft` or `CalendarMonth` — use `KeyboardArrowLeft`/`Right` and `DateRange`.
+Uses `com.kizitonwose.calendar:compose` 2.6.1, which is the **java.time** flavour — `CalendarDay.date` is a `java.time.LocalDate` and `rememberCalendarState` takes `java.time.YearMonth`, while the rest of the app speaks `kotlinx.datetime`. Convert at the boundary with `toKotlinLocalDate()` / `toJavaLocalDate()`; `minSdk = 26` means no desugaring is needed. Only core Material icons are on the classpath, so there is no `ChevronLeft` or `CalendarMonth` — use `DateRange` and the `AutoMirrored` arrows.
 
-**`PhaseDayCell` encodes two things at once.** Colour is the phase. Solid-versus-hollow is provenance: a period day the user logged is a filled circle, one the app merely expects — next month's, or one inferred across a gap in logging — is a ring. Menstrual is the only phase a user can record, so it is the only one that carries the distinction; the other three stay soft tints. Never let a prediction render as a record.
+**`PhaseDayCell` encodes two things at once.** Colour is the phase. Solid-versus-hollow is provenance: a period day the user logged is a filled circle, one the app merely expects — next month's, or one inferred across a gap in logging — is a ring. Menstrual is the only phase a user can record, so it is the only one that carries the distinction; the other three stay flat fills. Never let a prediction render as a record.
+
+**Today's ring sits at the cell's edge, not on the swatch — do not move it back.** Both rings were once `Modifier.border(1.5.dp, …, CircleShape)` on the same node, and chained borders draw at the same inset, so cream painted straight over blush: on a day that was both today *and* an expected period, the prediction silently vanished from the single cell most likely to be read. Two radii can carry two facts; two borders at one radius cannot. The outer ring is `fillMaxSize().padding(2.dp)` rather than a fixed dp so it can never outgrow a narrow cell.
+
+**Adjacent-month cells keep their phase at `adjacentColor` strength** and follow the same solid/hollow rule. Blanking them meant a period spanning a month boundary looked truncated — open September and the 31st of August, a day actually on record, showed as an empty cell. Grey them for interaction, not for information. Because those cells now carry information, `outDateStyle` is `EndOfRow`: the sixth row was only ever padding, and there is no longer a reason to manufacture one.
+
+The five-item legend is gone. The four colours are named on the home screen where the ring labels the phase you are in, so the only thing the grid still has to explain is what an outline means — `ProvenanceKey`, one line.
 
 **`CycleProjection`** (`domain/usecase/CycleProjection.kt`) resolves the medians once and answers `infoFor(date)` per cell — a grid asks about 42 dates, and `computePhaseForDate` would redo the whole median derivation for each. It is a data class so Compose can skip recomposition when history has not changed; `computePhaseForDate` now delegates to it, so there is one implementation of the rule.
 
