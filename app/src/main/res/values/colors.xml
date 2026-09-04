@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The two palette values that have to exist as Android resources rather than as Compose
+  constants: the launcher background is composited by the system, and the window
+  background is painted before any Compose code runs. ui/theme/Color.kt remains the
+  source of truth for everything drawn inside the app; these two must be kept in step
+  with LunaDeepNavy and LunaBlush by hand.
+-->
+<resources>
+    <color name="luna_deep_navy">#FF070E36</color>
+    <color name="luna_blush">#FFFAA7C7</color>
+</resources>

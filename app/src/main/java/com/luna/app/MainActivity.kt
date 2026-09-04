@@ -1,7 +1,9 @@
 package com.luna.app
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,7 +18,13 @@ import com.luna.app.ui.theme.LunaTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // Bare enableEdgeToEdge() picks system-bar icon colours from the device's light/dark
+        // setting. Luna is dark-only, so on a phone in light mode that gave dark icons on the
+        // navy background and the clock disappeared. The app knows it is dark; say so.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
+        )
         setContent {
             LunaTheme {
                 Surface(

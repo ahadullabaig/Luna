@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The window background is painted by the system between the launcher tap and Compose's
+  first frame. Inheriting DeviceDefault left that background at the device default,
+  which on a phone in light mode is white — so a dark-only app opened with a white flash.
+  Painting it navy makes the launch read as the app arriving rather than as a blink.
+-->
+<resources>
+    <style name="Theme.Luna" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/luna_deep_navy</item>
+    </style>
+</resources>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A waning crescent, drawn as the region between two circular arcs rather than as one
+  circle punched out of another. Subtracting a circle with evenOdd does not work here:
+  the cutting circle has to reach outside the moon's edge to make a crescent at all, and
+  everything in that overhang would come back as filled.
+
+  Outer edge is a 28r arc about the icon centre (54,54); the inner edge is a 26r arc
+  about (68,44). Both stay inside the 66dp circle an adaptive icon guarantees is visible
+  under every launcher mask, so no mask can clip the moon.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M78.33,67.86 A28,28 0 1,1 48.78,26.49 A26,26 0 0,0 78.33,67.86 Z" />
+</vector>
