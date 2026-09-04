@@ -30,7 +30,7 @@ Luna is a **local-only Android period tracker** — no network, no backend, no a
 ./gradlew test
 ```
 
-**Toolchain versions** live in `gradle/libs.versions.toml`. Current: `agp = "9.3.2"`, `kotlin = "2.2.10"`, `ksp = "2.3.6"`, Gradle `9.5.0`.
+**Toolchain versions** live in `gradle/libs.versions.toml`. Current: `agp = "9.4.0"`, `kotlin = "2.2.10"`, `ksp = "2.3.6"`, Gradle `9.6.0`.
 
 KSP no longer carries a Kotlin version prefix — KSP2 versions independently, so `ksp = "2.3.6"` pairs with `kotlin = "2.2.10"` with no lockstep rule to honour. (Earlier revisions of this file claimed the prefix must match; that was true of KSP1's `2.1.20-1.0.31` scheme and is no longer.) If a Kotlin bump breaks annotation processing, bump `ksp` to its own latest rather than hunting for a matching prefix.
 
