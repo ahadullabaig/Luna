@@ -13,3 +13,7 @@ build_error.txt
 build_out.txt
 .vscode/
 *.hprof
+
+# Signing key material — never commit these.
+*.jks
+*.keystore
