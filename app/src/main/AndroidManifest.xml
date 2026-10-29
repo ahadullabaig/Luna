@@ -27,6 +27,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          Stripped from the merged manifest. com.kizitonwose.calendar:compose declares ui-tooling
+          as a runtime dependency rather than a debug one, and ui-tooling's own manifest
+          contributes this activity with exported="true" — so every release build shipped a
+          Compose preview launcher that any other app on the phone could start, inside Luna's
+          process. Luna has no @Preview functions, so nothing in debug depends on it either.
+          Verify against the built APK with aapt2's xmltree dump, not against this file.
+        -->
+        <activity
+            android:name="androidx.compose.ui.tooling.PreviewActivity"
+            tools:node="remove" />
     </application>
 
 </manifest>
