@@ -59,8 +59,10 @@ fun PhaseDonut(
     strokeWidth: Dp = 30.dp,
     futureStrokeWidth: Dp = 3.dp
 ) {
-    val segments = remember(state.cycleLength, state.periodLength) {
-        phaseSegments(state.cycleLength, state.periodLength)
+    // This cycle's own period length, not the median: once a period is logged as three days, the
+    // ring must not keep drawing five days of menstrual ahead of a "Follicular" label.
+    val segments = remember(state.cycleLength, state.currentPeriodLength) {
+        phaseSegments(state.cycleLength, state.currentPeriodLength)
     }
 
     // Sweep the ring in on first composition.

@@ -140,6 +140,8 @@ If the output is named `app-release-unsigned.apk`, Gradle didn't find `keystore.
 
 That's the entire onboarding. There is no step 5.
 
+If you saved it without an end, the button reads **End period** for as long as it's running. Any period you've logged can be re-dated or deleted from its day in the calendar.
+
 Until you've logged two complete cycles, Luna says so rather than pretending: the footnote under the ring reads *"Still learning. Using 28-day estimates until you log two cycles."* After that it switches to your own medians.
 <br>
 
@@ -164,10 +166,10 @@ Until you've logged two complete cycles, Luna says so rather than pretending: th
 
 Single-module project. No clean-architecture ceremony. MVVM is enough for a personal app you maintain alone.
 
-The cycle maths lives in `domain/usecase/CycleMath.kt` as plain top-level functions over plain lists — no Room dependency, no repository, no mocks needed. That split is what makes the 45 unit tests possible; they cover every phase boundary day by day, the median derivations, and the edge cases where a phase drops out of a short cycle entirely.
+The cycle maths lives in `domain/usecase/CycleMath.kt` as plain top-level functions over plain lists — no Room dependency, no repository, no mocks needed. That split is what makes the 53 unit tests possible; they cover every phase boundary day by day, the median derivations, and the edge cases where a phase drops out of a short cycle entirely.
 
 ```bash
-./gradlew test    # 45 tests
+./gradlew test    # 53 tests
 ./gradlew lint
 ```
 <br>

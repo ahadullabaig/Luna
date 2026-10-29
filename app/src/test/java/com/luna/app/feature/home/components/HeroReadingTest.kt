@@ -24,6 +24,7 @@ class HeroReadingTest {
         cycleDay = cycleDay,
         cycleLength = 28,
         periodLength = 5,
+        currentPeriodLength = 5,
         nextPeriodStart = LocalDate.parse("2026-09-24"),
         daysUntilNextPeriod = daysUntil,
         isOverdue = overdue,

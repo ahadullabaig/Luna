@@ -2,6 +2,7 @@ package com.luna.app.feature.calendar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.luna.app.data.entity.PeriodEntity
 import com.luna.app.data.repo.CycleRepository
 import com.luna.app.domain.currentDate
 import com.luna.app.domain.usecase.GetPhaseForDate
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.minus
@@ -26,7 +28,7 @@ private const val MONTHS_FORWARD = 12
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
-    repository: CycleRepository,
+    private val repository: CycleRepository,
     getPhaseForDate: GetPhaseForDate
 ) : ViewModel() {
 
@@ -69,6 +71,18 @@ class CalendarViewModel @Inject constructor(
     fun refreshToday() {
         val current = currentDate()
         if (current != today.value) today.value = current
+    }
+
+    // The calendar is the only place a past period can be seen, so it is where one is corrected.
+    // Both writes land on the same getAllPeriods() flow that Home reads, so neither screen needs
+    // telling.
+
+    fun updatePeriod(period: PeriodEntity) {
+        viewModelScope.launch { repository.updatePeriod(period) }
+    }
+
+    fun deletePeriod(period: PeriodEntity) {
+        viewModelScope.launch { repository.deletePeriod(period) }
     }
 }
 

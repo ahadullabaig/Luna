@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -39,9 +40,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.luna.app.domain.model.CycleState
-import com.luna.app.feature.home.components.LogPeriodDialog
+import com.luna.app.domain.usecase.DEFAULT_PERIOD_LENGTH
+import com.luna.app.domain.usecase.overlappingPeriod
 import com.luna.app.feature.home.components.PhaseDonut
 import com.luna.app.feature.home.components.SymptomSection
+import com.luna.app.ui.common.PeriodDialog
 import com.luna.app.ui.theme.LunaBlush
 import com.luna.app.ui.theme.LunaDeepNavy
 import com.luna.app.ui.theme.LunaHairline
@@ -50,6 +53,7 @@ import com.luna.app.ui.theme.LunaTextSecondary
 import kotlinx.datetime.LocalDate
 
 private const val LOG_PERIOD = "Log a period"
+private const val END_PERIOD = "End period"
 
 @Composable
 fun HomeScreen(
@@ -57,7 +61,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var showLogDialog by rememberSaveable { mutableStateOf(false) }
+    var showPeriodDialog by rememberSaveable { mutableStateOf(false) }
 
     // A phone left open overnight should roll over to the new day when it comes back.
     LifecycleResumeEffect(Unit) {
@@ -69,13 +73,25 @@ fun HomeScreen(
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             // One app, one primary action — so it says which one. A bare "+" spent a whole
-            // floating button saying nothing.
+            // floating button saying nothing. While a period is running that action is ending it:
+            // logging another over it is exactly the overlap the dialog would refuse.
+            val ending = state.openPeriod != null
             ExtendedFloatingActionButton(
-                onClick = { showLogDialog = true },
+                onClick = { showPeriodDialog = true },
                 containerColor = LunaBlush,
                 contentColor = LunaDeepNavy,
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text(text = LOG_PERIOD, style = MaterialTheme.typography.titleMedium) }
+                icon = {
+                    Icon(
+                        imageVector = if (ending) Icons.Default.Check else Icons.Default.Add,
+                        contentDescription = null
+                    )
+                },
+                text = {
+                    Text(
+                        text = if (ending) END_PERIOD else LOG_PERIOD,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
             )
         }
     ) { padding ->
@@ -125,13 +141,30 @@ fun HomeScreen(
         }
     }
 
-    if (showLogDialog) {
-        LogPeriodDialog(
+    if (showPeriodDialog) {
+        val open = state.openPeriod
+        val periodLength = state.cycle?.periodLength ?: DEFAULT_PERIOD_LENGTH
+        // The open period is the one being edited, so it cannot be what the new days overlap.
+        val others = state.periods.filter { it.id != open?.id }
+        PeriodDialog(
+            title = if (open != null) END_PERIOD else LOG_PERIOD,
+            guidance = if (open != null) {
+                "Tap the day it ended."
+            } else {
+                "Pick the first day. Tap a second day to set the end, " +
+                    "or save with just one if your period is still going."
+            },
             today = state.today,
-            onDismiss = { showLogDialog = false },
+            initialStart = open?.startDate,
+            conflictWith = { start, end -> overlappingPeriod(start, end, others, periodLength) },
+            onDismiss = { showPeriodDialog = false },
             onConfirm = { start, end ->
-                viewModel.logPeriod(start, end)
-                showLogDialog = false
+                if (open != null) {
+                    viewModel.updatePeriod(open.copy(startDate = start, endDate = end))
+                } else {
+                    viewModel.logPeriod(start, end)
+                }
+                showPeriodDialog = false
             }
         )
     }
@@ -213,9 +246,10 @@ private fun EmptyCycleRing() {
 
 @Composable
 private fun CycleFootnote(cycle: CycleState) {
+    // No article before the number: "a 8-day period" was what rendered for an eight-day median.
     val text = if (cycle.isPersonalised) {
         "Your recent cycles average ${cycle.cycleLength} days, " +
-            "with a ${cycle.periodLength}-day period."
+            "with periods of ${cycle.periodLength} days."
     } else {
         "Still learning. Using ${cycle.cycleLength}-day estimates until you log two cycles."
     }

@@ -149,6 +149,45 @@ class CycleMathTest {
         assertNull(periodLengthFrom(periods))
     }
 
+    // --- overlap and open periods --------------------------------------------
+
+    @Test
+    fun `a range sharing any day with a logged period overlaps it`() {
+        val logged = listOf(PeriodEntity(1, date("2026-03-01"), date("2026-03-05")))
+        assertEquals(1L, overlappingPeriod(date("2026-03-05"), date("2026-03-07"), logged, 5)?.id)
+        assertEquals(1L, overlappingPeriod(date("2026-02-27"), date("2026-03-01"), logged, 5)?.id)
+    }
+
+    @Test
+    fun `periods that only touch do not overlap`() {
+        val logged = listOf(PeriodEntity(1, date("2026-03-01"), date("2026-03-05")))
+        assertNull(overlappingPeriod(date("2026-03-06"), date("2026-03-08"), logged, 5))
+        assertNull(overlappingPeriod(date("2026-02-25"), date("2026-02-28"), logged, 5))
+    }
+
+    @Test
+    fun `open ranges overlap across the days they are assumed to run`() {
+        // Started 1 March with no end: with a five-day median it covers the 1st to the 5th.
+        val open = listOf(PeriodEntity(1, date("2026-03-01"), null))
+        assertEquals(1L, overlappingPeriod(date("2026-03-05"), date("2026-03-06"), open, 5)?.id)
+        assertNull(overlappingPeriod(date("2026-03-06"), null, open, 5))
+        // A new open range runs five days too, so one starting 25 February reaches 1 March.
+        assertEquals(1L, overlappingPeriod(date("2026-02-25"), null, open, 5)?.id)
+    }
+
+    @Test
+    fun `an open period is running only within its assumed length`() {
+        val open = listOf(PeriodEntity(1, date("2026-03-01"), null))
+        assertEquals(1L, openPeriodOn(date("2026-03-05"), open, 5)?.id)
+        assertNull(openPeriodOn(date("2026-03-06"), open, 5))
+    }
+
+    @Test
+    fun `a period with an end date is never running`() {
+        val ended = listOf(PeriodEntity(1, date("2026-03-01"), date("2026-03-03")))
+        assertNull(openPeriodOn(date("2026-03-02"), ended, 5))
+    }
+
     @Test
     fun `only the six most recent periods feed the medians`() {
         // Eight periods: the two oldest sit on a 40-day rhythm that must fall out of the window.

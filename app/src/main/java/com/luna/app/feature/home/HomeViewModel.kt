@@ -9,6 +9,7 @@ import com.luna.app.domain.currentDate
 import com.luna.app.domain.model.Energy
 import com.luna.app.domain.model.FlowLevel
 import com.luna.app.domain.usecase.GetCurrentCycleState
+import com.luna.app.domain.usecase.openPeriodOn
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,9 +39,17 @@ class HomeViewModel @Inject constructor(
         .flatMapLatest { date ->
             combine(
                 getCurrentCycleState(date),
+                repository.getAllPeriods(),
                 repository.getDailyLog(date)
-            ) { cycle, log ->
-                HomeUiState(today = date, isLoading = false, cycle = cycle, todayLog = log)
+            ) { cycle, periods, log ->
+                HomeUiState(
+                    today = date,
+                    isLoading = false,
+                    cycle = cycle,
+                    periods = periods,
+                    openPeriod = cycle?.let { openPeriodOn(date, periods, it.periodLength) },
+                    todayLog = log
+                )
             }
         }
         .stateIn(
@@ -74,6 +83,13 @@ class HomeViewModel @Inject constructor(
     fun logPeriod(start: LocalDate, end: LocalDate?) {
         viewModelScope.launch {
             repository.insertPeriod(PeriodEntity(startDate = start, endDate = end))
+        }
+    }
+
+    /** Ending the open period is an edit of its row, not a second row with the same start. */
+    fun updatePeriod(period: PeriodEntity) {
+        viewModelScope.launch {
+            repository.updatePeriod(period)
         }
     }
 

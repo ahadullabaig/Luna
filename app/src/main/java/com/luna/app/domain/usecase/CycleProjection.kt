@@ -34,15 +34,22 @@ data class CycleProjection(
      */
     fun infoFor(date: LocalDate): DayInfo {
         val anchor = periodsNewestFirst.firstOrNull { it.startDate <= date } ?: return DayInfo.Unknown
-        val logged = periodCovering(date, periodsNewestFirst, periodLength)
-        val cycleDay = anchor.startDate.daysUntil(date).mod(cycleLength) + 1
+        val logged = loggedPeriodOn(date)
+        val offset = anchor.startDate.daysUntil(date)
+        val cycleDay = offset.mod(cycleLength) + 1
+        // Inside the anchor's own cycle a logged end date is a fact, and the days after it are over
+        // rather than "expected". Cycles projected beyond it have only the median to go on.
+        val bleedDays = if (offset < cycleLength) anchor.loggedLength()?.takeIf { it > 0 } ?: periodLength else periodLength
         return DayInfo(
             // A logged period always wins over the projection, exactly as on the home screen.
-            phase = if (logged != null) CyclePhase.MENSTRUAL else phaseForDay(cycleDay, cycleLength, periodLength),
+            phase = if (logged != null) CyclePhase.MENSTRUAL else phaseForDay(cycleDay, cycleLength, bleedDays),
             cycleDay = cycleDay,
             isLoggedPeriod = logged != null
         )
     }
+
+    /** The logged period [date] falls inside, if any — what the calendar's edit and delete act on. */
+    fun loggedPeriodOn(date: LocalDate): PeriodEntity? = periodCovering(date, periodsNewestFirst, periodLength)
 
     companion object {
         val Empty = CycleProjection(

@@ -62,10 +62,20 @@ fun periodLengthFrom(periods: List<PeriodEntity>): Int? {
         .filter { it.endDate != null }
         .sortedByDescending { it.startDate }
         .take(HISTORY_WINDOW)
-        .map { it.startDate.daysUntil(it.endDate!!) + 1 }
+        .mapNotNull { it.loggedLength() }
         .filter { it > 0 }
     return if (lengths.size < MIN_SAMPLES) null else lengths.medianOrNull()
 }
+
+/** Inclusive length of a period that has an end date; null while it is still open. */
+fun PeriodEntity.loggedLength(): Int? = endDate?.let { startDate.daysUntil(it) + 1 }
+
+/**
+ * The last day this period covers: its end date once one is logged, otherwise [periodLength] days
+ * from its start. One rule for what the calendar draws as logged and for what counts as an overlap.
+ */
+fun PeriodEntity.lastDay(periodLength: Int): LocalDate =
+    endDate ?: startDate.plusDays(periodLength - 1)
 
 /**
  * Phase for a 1-based day of the cycle.
@@ -114,9 +124,35 @@ fun periodCovering(
     periods: List<PeriodEntity>,
     periodLength: Int
 ): PeriodEntity? = periods.firstOrNull { period ->
-    val last = period.endDate ?: period.startDate.plusDays(periodLength - 1)
-    date >= period.startDate && date <= last
+    date >= period.startDate && date <= period.lastDay(periodLength)
 }
+
+/**
+ * The first of [periods] sharing a day with [start]..[end], or null if none does. An open range on
+ * either side runs [periodLength] days, as it does everywhere else; periods that only touch — one
+ * ending on the 5th, the next starting on the 6th — do not overlap.
+ *
+ * The period dialogs refuse an overlapping range. Before a period could be edited, logging the same
+ * days a second time was the only way to record its end, and every time it left a duplicate row
+ * behind to skew both medians.
+ */
+fun overlappingPeriod(
+    start: LocalDate,
+    end: LocalDate?,
+    periods: List<PeriodEntity>,
+    periodLength: Int
+): PeriodEntity? {
+    val last = end ?: start.plusDays(periodLength - 1)
+    return periods.firstOrNull { it.startDate <= last && start <= it.lastDay(periodLength) }
+}
+
+/**
+ * The period still running on [today]: logged without an end, and inside the [periodLength] days
+ * the app assumes for it. Past that window it already reads as over everywhere, so Home stops
+ * offering to end it — it can still be closed from the calendar.
+ */
+fun openPeriodOn(today: LocalDate, periods: List<PeriodEntity>, periodLength: Int): PeriodEntity? =
+    periods.firstOrNull { it.endDate == null && today >= it.startDate && today <= it.lastDay(periodLength) }
 
 fun LocalDate.plusDays(days: Int): LocalDate =
     LocalDate.fromEpochDays(toEpochDays() + days)
@@ -142,13 +178,18 @@ fun computeCycleState(periods: List<PeriodEntity>, today: LocalDate): CycleState
     val nextPeriodStart = anchor.startDate.plusDays(cycleLength)
     val daysUntilNextPeriod = today.daysUntil(nextPeriodStart)
 
+    // The median is a forecast. Once this cycle's period has an end date, that date is a fact, and
+    // a period logged as three days long must not read as menstrual on day 4 because the median
+    // says five.
+    val currentPeriodLength = anchor.loggedLength()?.takeIf { it > 0 } ?: periodLength
+
     // A logged period always wins over the projection: if today falls inside one, the phase is
     // menstrual whatever the arithmetic would otherwise say.
     val covering = periodCovering(today, past, periodLength)
     val phase = if (covering != null) {
         CyclePhase.MENSTRUAL
     } else {
-        phaseForDay(cycleDay.coerceIn(1, cycleLength), cycleLength, periodLength)
+        phaseForDay(cycleDay.coerceIn(1, cycleLength), cycleLength, currentPeriodLength)
     }
 
     return CycleState(
@@ -156,6 +197,7 @@ fun computeCycleState(periods: List<PeriodEntity>, today: LocalDate): CycleState
         cycleDay = cycleDay,
         cycleLength = cycleLength,
         periodLength = periodLength,
+        currentPeriodLength = currentPeriodLength,
         nextPeriodStart = nextPeriodStart,
         daysUntilNextPeriod = daysUntilNextPeriod,
         isOverdue = covering == null && daysUntilNextPeriod < -OVERDUE_GRACE_DAYS,

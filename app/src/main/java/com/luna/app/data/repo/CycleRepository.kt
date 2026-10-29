@@ -32,6 +32,10 @@ class CycleRepository @Inject constructor(
         periodDao.updatePeriod(period)
     }
 
+    suspend fun deletePeriod(period: PeriodEntity) {
+        periodDao.deletePeriod(period)
+    }
+
     suspend fun getRecentPeriods(limit: Int): List<PeriodEntity> {
         return periodDao.getRecentPeriods(limit)
     }

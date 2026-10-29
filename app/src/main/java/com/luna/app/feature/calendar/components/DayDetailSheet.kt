@@ -1,5 +1,6 @@
 package com.luna.app.feature.calendar.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -13,22 +14,29 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.luna.app.data.entity.DailyLogEntity
+import com.luna.app.data.entity.PeriodEntity
 import com.luna.app.domain.model.CyclePhase
 import com.luna.app.domain.model.DayInfo
+import com.luna.app.ui.common.describe
 import com.luna.app.ui.common.loggedSymptoms
 import com.luna.app.ui.theme.LunaBlush
 import com.luna.app.ui.theme.LunaCream
 import com.luna.app.ui.theme.LunaNavyRaised
+import com.luna.app.ui.theme.LunaOutline
 import com.luna.app.ui.theme.LunaTextPrimary
 import com.luna.app.ui.theme.LunaTextSecondary
 import com.luna.app.ui.theme.color
@@ -37,16 +45,23 @@ import kotlinx.datetime.LocalDate
 
 /**
  * What is known about one tapped day: where it sits in the cycle, and anything recorded against
- * it. Read-only by design — the home screen is the one place symptoms are edited, so there is no
- * second editor to keep in step with it.
+ * it. Symptoms are read-only here — the home screen is the one place they are edited, so there is
+ * no second editor to keep in step with it.
+ *
+ * Periods are the exception. This is the only place a past period can be seen at all, so it is
+ * where one is corrected: [period] is the logged period this day falls inside, and when there is
+ * one the sheet offers to edit its dates or delete it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DayDetailSheet(
     date: LocalDate,
     info: DayInfo,
+    period: PeriodEntity?,
     log: DailyLogEntity?,
     isToday: Boolean,
+    onEditPeriod: (PeriodEntity) -> Unit,
+    onDeletePeriod: (PeriodEntity) -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(
@@ -116,14 +131,35 @@ fun DayDetailSheet(
                 if (phase == CyclePhase.MENSTRUAL) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = if (info.isLoggedPeriod) {
-                            "Period logged"
-                        } else {
-                            "Period expected, not logged yet"
+                        text = when {
+                            period != null -> "Period logged, ${period.describe()}"
+                            info.isLoggedPeriod -> "Period logged"
+                            else -> "Period expected, not logged yet"
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = LunaBlush
                     )
+                }
+                if (period != null) {
+                    Spacer(Modifier.height(16.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Same pill as the calendar's Today button: something you can press,
+                        // bounded by the outline weight rather than filled.
+                        OutlinedButton(
+                            onClick = { onEditPeriod(period) },
+                            shape = RoundedCornerShape(percent = 50),
+                            border = BorderStroke(1.dp, LunaOutline),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = LunaTextPrimary)
+                        ) {
+                            Text(text = "Edit dates", style = MaterialTheme.typography.labelLarge)
+                        }
+                        TextButton(
+                            onClick = { onDeletePeriod(period) },
+                            colors = ButtonDefaults.textButtonColors(contentColor = LunaTextSecondary)
+                        ) {
+                            Text(text = "Delete", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
                 }
             }
 

@@ -54,31 +54,43 @@ Single `app` module. MVVM. Package layout by feature, not by layer.
 
 **All five milestones are complete.** Luna builds, signs and installs; there is no next milestone. Milestones 1 (skeleton/theme), 2 (data layer), 3 (home screen), 4 (calendar) and 5 (polish + signed APK) are all done. The M2 debug scaffolding — the period counter and "Insert Fake Period" button — is gone, replaced by the real home screen, and the calendar is reachable from the date icon beside the home header.
 
-A **design pass** then went over both screens: the solid/hollow provenance rule was promoted from the calendar to the whole app, the two 40%-alpha phase colours became opaque constants, cream collapsed from nineteen alphas to five named roles, and the app gained real typography. Six measured defects were fixed along the way — see the Design system, Typography, Phase donut and Calendar sections, which carry the "do not undo this" notes. **The redesign has been verified by compiler and unit tests only; nobody has run it on a device or emulator yet.** Give the two screens a look before trusting the layout.
+A **design pass** then went over both screens: the solid/hollow provenance rule was promoted from the calendar to the whole app, the two 40%-alpha phase colours became opaque constants, cream collapsed from nineteen alphas to five named roles, and the app gained real typography. Six measured defects were fixed along the way — see the Design system, Typography, Phase donut and Calendar sections, which carry the "do not undo this" notes. It was first seen running on the emulator on 2026-10-29, and held up. That look found two things arithmetic had missed: a footnote that rendered "a 8-day period" (fixed), and slivers of the neighbouring months peeking in at both edges of the calendar grid, from `HorizontalCalendar`'s `contentPadding` (not yet fixed).
+
+**Periods can be corrected.** Until 2026-10-29 the only write to `periods` was an insert, so an ongoing period could never be ended — logging the same days again to record the end left a duplicate row — and a mistaken one could never be removed. Now, while an open period covers today, Home's primary button reads **End period**. Any logged period can be re-dated or deleted from its day sheet in the calendar. `ui/common/PeriodDialog.kt` is the one range picker behind all three, and it refuses a range that overlaps another logged period (`overlappingPeriod()` in `CycleMath.kt`). No schema change was needed.
 
 **Milestone 5** delivered `proguard-rules.pro` (referenced since M1 but never written, so `assembleRelease` had never once succeeded), an adaptive launcher icon, a navy launch window, and a signing config. The signed APK is 1.8MB against the debug build's 11MB.
 
 **Backup is off, in both of the places Android keeps it.** `allowBackup="false"` opts out of cloud backup on every version Luna runs on. That used to be the whole story, but Android 12 split device-to-device transfer out into `android:dataExtractionRules`, which does not consult `allowBackup` — so setting up a new phone from an old one would have carried the Room database across a network the app claims never to touch. `res/xml/data_extraction_rules.xml` excludes every domain from both `<cloud-backup>` and `<device-transfer>`. This is the file that has to stay right for the local-only claim to be true; if you ever see it edited, that is the claim being edited.
 
-**Known debt, deliberately unaddressed:** `PeriodDao.getRecentPeriods()` and its `CycleRepository` passthrough are dead code (M3 reads full history as a `Flow` instead).
+**Known debt, deliberately unaddressed:** `PeriodDao.getRecentPeriods()` and `getLatestPeriod()`, and their `CycleRepository` passthroughs, are dead code (M3 reads full history as a `Flow` instead). `computePhaseForDate()` is reached only from tests.
+
+**Known, not yet decided:** Home and Calendar still compute "where am I in the cycle" two ways. `computeCycleState` counts the cycle day without bound, while `CycleProjection.infoFor` wraps it modulo `cycleLength`, so once a cycle runs past its prediction the two screens disagree. With the emulator's own data, Home said "Luteal, day 59, 12 days late" while the calendar drew that day as follicular, with an "expected" period painted over days already past. Fixing it needs a product decision about what the calendar should show when a period is late.
 
 ---
 
 ## Verifying your work
 
-**There is no emulator on this machine.** The user has said so twice; a headless boot with `-memory 2048` still failed to reach `sys.boot_completed`. Do not start one. If you ever do start one, kill `qemu-system-x86_64`, `netsimd` and the adb server afterwards.
-
-So "verified" here means exactly three things, and you should say which of them you did rather than implying more:
+Every change gets these three, and you should say which you ran rather than implying more:
 
 ```bash
 ./gradlew assembleDebug assembleRelease   # compiles, and R8 runs
-./gradlew test                            # 45 tests, 0 failures
-./gradlew lint                            # baseline is 22 warnings
+./gradlew test                            # 53 tests, 0 failures
+./gradlew lint                            # baseline is 23 warnings
 ```
 
-The lint baseline is **22 warnings**, all pre-existing dependency-freshness notices (`GradleDependency`, `NewerVersionAvailable`, `AndroidGradlePluginVersion`, `OldTargetApi`). If you see 23, you added one — look at it rather than assuming it is noise. Two of the four M5 warnings turned out to be real.
+The lint baseline is **23 warnings**, all dependency-freshness notices (`GradleDependency`, `NewerVersionAvailable`, `AndroidGradlePluginVersion`, `OldTargetApi`). It moves on its own when upstream ships a release — the 23rd arrived with AGP 9.5.0 — so a new warning is either that or yours. Look at it rather than assuming it is noise. Two of the four M5 warnings turned out to be real.
 
-For anything that renders, arithmetic is the only tool available and it is weakest exactly where type metrics and rounded-corner composition are involved. Say plainly that it has not been seen running, and name what you would want eyes on. Never write "verified" for a layout.
+**For anything that renders, use the emulator** — the `Pixel_10_Pro` AVD (Android 37, 2 GB). The machine has 16 GB and the emulator takes about 4.5 GB, so:
+
+```bash
+./gradlew --stop        # before booting, and after each build while it is up
+emulator -avd Pixel_10_Pro -no-window -no-audio -no-boot-anim -no-snapshot \
+  -gpu host -camera-back none -camera-front none -memory 2048 -cores 2
+```
+
+`-gpu host` is not optional. Headless, the emulator otherwise falls back to SwiftShader and segfaults (exit 139) as the guest starts, with or without Vulkan — that is what killed every earlier attempt on this machine. The image is userdebug, so `adb root` works and the database can be read with the on-device `sqlite3`. The Luna install on it holds the user's own test history: back up `/data/data/com.luna.app/databases/` before seeding anything, and push it back afterwards. When done, `adb emu kill`, then kill `netsimd` and run `adb kill-server`.
+
+Say which screens you actually looked at. A layout you reasoned about but did not see is not verified.
 
 Claims about the built artifact can be checked without a device, and should be:
 
@@ -119,11 +131,12 @@ Period length is **inclusive of both endpoints** — `startDate.daysUntil(endDat
 **Edge cases that must be handled explicitly:**
 - No periods logged → empty state ("Nothing logged yet" / "Tap Log a period and the ring fills in."), not a donut.
 - Today is inside a logged period → phase is MENSTRUAL regardless of calculation.
+- The period has a logged end that comes before the median length → the days after it are over, not menstrual and not "expected". The median is a forecast and a logged end date is a fact. `CycleState.currentPeriodLength` carries this cycle's own length, the ring is drawn from it, and `infoFor` applies the same rule inside the anchor's cycle. Cycles projected beyond the anchor use only the median.
 - Today is past `nextPeriodStart` + 3-day grace → overdue. This is stated **once**, by the ring's centre number turning blush and reading "N days late". There was briefly a separate `OverdueBanner` above the donut saying the same thing 20dp away; do not reintroduce it.
 
 **Where this lives:** the pure functions are top-level in `domain/usecase/CycleMath.kt` — `computeCycleState(periods, today)` and `computePhaseForDate(date, periods)` are the entry points, and they take plain lists, not a repository. `GetCurrentCycleState` and `GetPhaseForDate` are thin `Flow` wrappers over `CycleRepository` that delegate to them. Keep new cycle logic in `CycleMath.kt`: the split is what makes it testable without mocking Room.
 
-Tests are in `app/src/test/java/com/luna/app/` — 45 in total. 39 under `domain/usecase/` cover the medians, every phase boundary day-by-day, the three edge cases above, and the invariant that `phaseSegments()` always sums to `cycleLength`. The other 6 are `feature/home/components/HeroReadingTest` — `heroReading()` is pure and picks which number the ring shows, so it is testable without Compose and worth testing. That is the only exception to "tests are for `domain/usecase/` only": still no Composable tests.
+Tests are in `app/src/test/java/com/luna/app/` — 53 in total. 47 under `domain/usecase/` cover the medians, every phase boundary day-by-day, the edge cases above, overlap and open-period detection, and the invariant that `phaseSegments()` always sums to `cycleLength`. The other 6 are `feature/home/components/HeroReadingTest` — `heroReading()` is pure and picks which number the ring shows, so it is testable without Compose and worth testing. That is the only exception to "tests are for `domain/usecase/` only": still no Composable tests.
 
 ---
 
@@ -211,6 +224,8 @@ Uses `com.kizitonwose.calendar:compose` 2.6.1, which is the **java.time** flavou
 
 The five-item legend is gone. The four colours are named on the home screen where the ring labels the phase you are in, so the only thing the grid still has to explain is what an outline means — `ProvenanceKey`, one line.
 
+**`DayDetailSheet` is read-only for symptoms and editable for periods.** Symptoms are edited only on Home, so there is no second symptom editor to keep in step. But the calendar is the only place a past period can be seen at all, so a logged period day's sheet offers **Edit dates** and **Delete**. `CycleProjection.loggedPeriodOn(date)` finds the row. `CalendarScreen` holds the edit and delete-confirmation state by period id in `rememberSaveable`, the same way it holds the selected day by epoch day. Deleting a period leaves that period's symptom rows alone: a symptom belongs to a day, not to a period.
+
 **`CycleProjection`** (`domain/usecase/CycleProjection.kt`) resolves the medians once and answers `infoFor(date)` per cell — a grid asks about 42 dates, and `computePhaseForDate` would redo the whole median derivation for each. It is a data class so Compose can skip recomposition when history has not changed; `computePhaseForDate` now delegates to it, so there is one implementation of the rule.
 
 `rememberCalendarState` is keyed on its month bounds via `rememberSaveable(inputs = …)`, so changing them **recreates** the state and resets the scroll. The bounds come from `CalendarUiState.rangeStart/rangeEnd`, which move only when today's month changes — a plain midnight rollover leaves the scroll position alone.
@@ -261,6 +276,8 @@ The crescent in `res/drawable/ic_launcher_foreground.xml` is the region between 
 `res/values/colors.xml` duplicates two values from `ui/theme/Color.kt` because the system needs them as Android resources before any Compose code runs. Keep them in step by hand.
 
 **The manifest carries one lint suppression, `tools:ignore="DataExtractionRules"`, and it is reasoned rather than lazy.** Lint asks for `android:fullBackupContent` alongside `android:dataExtractionRules`, because the latter only applies from Android 12 while `minSdk` is 26. That advice assumes `allowBackup` is true. It is false, which disables backup outright below Android 12, so `fullBackupContent` would never be read. Adding one would be worse than adding nothing: a rules file that nothing consults still looks, to the next reader, like the thing protecting the data.
+
+**The manifest also removes an activity Luna never declared.** `com.kizitonwose.calendar:compose` depends on `ui-tooling` at runtime, not just in debug, and `ui-tooling`'s manifest contributes `androidx.compose.ui.tooling.PreviewActivity` with `exported="true"`. Until 2026-10-29 every release APK shipped a Compose preview launcher that any app on the phone could start inside Luna's process. A `tools:node="remove"` entry strips it, and R8 then drops the class. The source manifest is not the surface — the merged one is, and libraries add to it. Check with `aapt2 dump xmltree` on the APK (see Verifying your work), which should show exactly one activity, one signature-level `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` from androidx.core, and no `INTERNET`.
 
 ---
 

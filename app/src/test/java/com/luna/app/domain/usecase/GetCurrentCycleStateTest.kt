@@ -57,6 +57,18 @@ class GetCurrentCycleStateTest {
     }
 
     @Test
+    fun `a period logged as ending early is over the next day, whatever the median says`() {
+        // Every earlier period ran five days, so the median stays five. This one was logged as
+        // three, and day 4 is the day after it ended — follicular, not "day 4 of your period".
+        val history = regularHistory().dropLast(1) +
+            PeriodEntity(6, date("2026-04-09"), date("2026-04-11"))
+        val state = computeCycleState(history, date("2026-04-12"))!!
+        assertEquals(5, state.periodLength)
+        assertEquals(3, state.currentPeriodLength)
+        assertEquals(CyclePhase.FOLLICULAR, state.currentPhase)
+    }
+
+    @Test
     fun `mid cycle resolves to the follicular phase and counts down`() {
         val state = computeCycleState(regularHistory(), date("2026-04-17"))!!  // day 9
         assertEquals(9, state.cycleDay)

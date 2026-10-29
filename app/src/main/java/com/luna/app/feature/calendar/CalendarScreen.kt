@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,11 +49,17 @@ import com.kizitonwose.calendar.core.OutDateStyle
 import com.kizitonwose.calendar.core.daysOfWeek
 import com.kizitonwose.calendar.core.firstDayOfWeekFromLocale
 import com.kizitonwose.calendar.core.yearMonth
+import com.luna.app.data.entity.PeriodEntity
 import com.luna.app.domain.model.CyclePhase
+import com.luna.app.domain.usecase.overlappingPeriod
 import com.luna.app.feature.calendar.components.AdjacentMonthCell
 import com.luna.app.feature.calendar.components.DayDetailSheet
 import com.luna.app.feature.calendar.components.PhaseDayCell
 import com.luna.app.feature.calendar.components.WeekdayHeader
+import com.luna.app.ui.common.PeriodDialog
+import com.luna.app.ui.common.describe
+import com.luna.app.ui.theme.LunaBlush
+import com.luna.app.ui.theme.LunaNavyRaised
 import com.luna.app.ui.theme.LunaOutline
 import com.luna.app.ui.theme.LunaTextPrimary
 import com.luna.app.ui.theme.LunaTextSecondary
@@ -169,17 +177,76 @@ fun CalendarScreen(
         }
     }
 
+    // By id, like the selected day by epoch day, so an edit in progress survives process death. The
+    // period itself is looked up fresh from the projection each time, so it is never stale.
+    var editingPeriodId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var deletingPeriodId by rememberSaveable { mutableStateOf<Long?>(null) }
+
     selectedEpochDay?.let { epochDay ->
         val date = LocalDate.fromEpochDays(epochDay)
         DayDetailSheet(
             date = date,
             info = state.projection.infoFor(date),
+            period = state.projection.loggedPeriodOn(date),
             log = state.logsByDate[date],
             isToday = date == state.today,
+            onEditPeriod = { editingPeriodId = it.id },
+            onDeletePeriod = { deletingPeriodId = it.id },
             onDismiss = { selectedEpochDay = null }
         )
     }
+
+    state.periodWithId(editingPeriodId)?.let { period ->
+        val others = state.projection.periodsNewestFirst.filter { it.id != period.id }
+        PeriodDialog(
+            title = "Edit period",
+            guidance = "Tap the first day, then the last. Save with just one day if it is still going.",
+            today = state.today,
+            initialStart = period.startDate,
+            initialEnd = period.endDate,
+            conflictWith = { start, end ->
+                overlappingPeriod(start, end, others, state.projection.periodLength)
+            },
+            onDismiss = { editingPeriodId = null },
+            onConfirm = { start, end ->
+                viewModel.updatePeriod(period.copy(startDate = start, endDate = end))
+                editingPeriodId = null
+            }
+        )
+    }
+
+    state.periodWithId(deletingPeriodId)?.let { period ->
+        AlertDialog(
+            onDismissRequest = { deletingPeriodId = null },
+            containerColor = LunaNavyRaised,
+            title = { Text("Delete this period?") },
+            text = {
+                Text(
+                    // There is no undo and no backup, so say both plainly before the tap.
+                    text = "Luna will forget the period logged ${period.describe()}, and work out " +
+                        "your averages without it. This cannot be undone.",
+                    color = LunaTextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deletePeriod(period)
+                    deletingPeriodId = null
+                    // The sheet was about this period; with it gone there is nothing left to show.
+                    selectedEpochDay = null
+                }) { Text("Delete", color = LunaBlush) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingPeriodId = null }) {
+                    Text("Cancel", color = LunaTextSecondary)
+                }
+            }
+        )
+    }
 }
+
+private fun CalendarUiState.periodWithId(id: Long?): PeriodEntity? =
+    id?.let { projection.periodsNewestFirst.firstOrNull { period -> period.id == it } }
 
 @Composable
 private fun MonthHeader(

@@ -83,6 +83,26 @@ class CycleProjectionTest {
         assertFalse(projection.infoFor(date("2026-05-02")).isLoggedPeriod)  // day 6, past the end
     }
 
+    @Test
+    fun `days after a period logged as ending early are not drawn as expected`() {
+        // The median is five days but the last period was logged as three. Days 4 and 5 are over:
+        // a record outranks the projection, in this direction as much as the other.
+        val projection = projectionFrom(regularHistory.dropLast(1) + period("2026-03-30", "2026-04-01"))
+        assertEquals(5, projection.periodLength)
+        val dayFour = projection.infoFor(date("2026-04-02"))
+        assertEquals(CyclePhase.FOLLICULAR, dayFour.phase)
+        assertFalse(dayFour.isLoggedPeriod)
+    }
+
+    @Test
+    fun `the next projected cycle goes back to the median period length`() {
+        // 2026-04-27 opens the next cycle, which nobody has logged, so only the median applies.
+        val projection = projectionFrom(regularHistory.dropLast(1) + period("2026-03-30", "2026-04-01"))
+        val dayFive = projection.infoFor(date("2026-05-01"))
+        assertEquals(CyclePhase.MENSTRUAL, dayFive.phase)
+        assertFalse(dayFive.isLoggedPeriod)
+    }
+
     // --- anchoring and cycle day ---------------------------------------------
 
     @Test
