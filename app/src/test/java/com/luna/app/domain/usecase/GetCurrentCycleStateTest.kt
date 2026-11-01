@@ -104,6 +104,33 @@ class GetCurrentCycleStateTest {
     }
 
     @Test
+    fun `home and the calendar agree about a late day`() {
+        // They used to part ways the moment a period ran late: Home kept counting while the
+        // calendar wrapped into a new cycle and called the same day follicular. Both now ask the
+        // same projection.
+        val today = date("2026-05-20")   // thirteen days after the 2026-05-07 due date
+        val state = computeCycleState(regularHistory(), today)!!
+        val info = projectionFrom(regularHistory(), today).infoFor(today)
+        assertTrue(state.isOverdue)
+        assertEquals(state.cycleDay, info.cycleDay)
+        assertEquals(state.currentPhase, info.phase)
+    }
+
+    @Test
+    fun `cycle and period length are each claimed as measured only when they are`() {
+        // Three starts but no end dates: the cycle length is the user's own, the period length is
+        // still the default, and the footnote must not present the default as theirs.
+        val startsOnly = listOf(
+            PeriodEntity(1, date("2026-02-12"), null),
+            PeriodEntity(2, date("2026-03-12"), null),
+            PeriodEntity(3, date("2026-04-09"), null)
+        )
+        val state = computeCycleState(startsOnly, date("2026-04-20"))!!
+        assertTrue(state.isCycleLengthMeasured)
+        assertFalse(state.isPeriodLengthMeasured)
+    }
+
+    @Test
     fun `a single logged period falls back to the defaults and says so`() {
         val history = listOf(PeriodEntity(1, date("2026-04-09"), null))
         val state = computeCycleState(history, date("2026-04-20"))!!

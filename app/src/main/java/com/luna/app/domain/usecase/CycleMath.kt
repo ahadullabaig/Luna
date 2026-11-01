@@ -162,55 +162,34 @@ fun LocalDate.plusDays(days: Int): LocalDate =
  *
  * Pure: takes the period list rather than a repository, so it is directly unit-testable and the
  * use case above it is reduced to wiring a Flow to this function.
+ *
+ * Phase and cycle day come from asking the calendar's [CycleProjection] about today. Home and the
+ * calendar used to compute them separately and disagreed as soon as a period ran late; with one
+ * implementation they cannot.
  */
 fun computeCycleState(periods: List<PeriodEntity>, today: LocalDate): CycleState? {
-    // Periods logged with a future start date cannot describe today.
-    val past = periods.filter { it.startDate <= today }
-    if (past.isEmpty()) return null
+    val projection = projectionFrom(periods, today)
+    val anchor = projection.currentAnchor ?: return null
+    val info = projection.infoFor(today)
+    val phase = info.phase ?: return null
+    val cycleDay = info.cycleDay ?: return null
 
-    val measuredCycle = cycleLengthFrom(past)
-    val measuredPeriod = periodLengthFrom(past)
-    val cycleLength = measuredCycle ?: DEFAULT_CYCLE_LENGTH
-    val periodLength = measuredPeriod ?: DEFAULT_PERIOD_LENGTH
-
-    val anchor = past.maxBy { it.startDate }
-    val cycleDay = anchor.startDate.daysUntil(today) + 1
-    val nextPeriodStart = anchor.startDate.plusDays(cycleLength)
+    // The prediction as first made, not the forecast that slides forward while late: lateness is
+    // counted from the day the period was due.
+    val nextPeriodStart = anchor.startDate.plusDays(projection.cycleLength)
     val daysUntilNextPeriod = today.daysUntil(nextPeriodStart)
-
-    // The median is a forecast. Once this cycle's period has an end date, that date is a fact, and
-    // a period logged as three days long must not read as menstrual on day 4 because the median
-    // says five.
-    val currentPeriodLength = anchor.loggedLength()?.takeIf { it > 0 } ?: periodLength
-
-    // A logged period always wins over the projection: if today falls inside one, the phase is
-    // menstrual whatever the arithmetic would otherwise say.
-    val covering = periodCovering(today, past, periodLength)
-    val phase = if (covering != null) {
-        CyclePhase.MENSTRUAL
-    } else {
-        phaseForDay(cycleDay.coerceIn(1, cycleLength), cycleLength, currentPeriodLength)
-    }
 
     return CycleState(
         currentPhase = phase,
         cycleDay = cycleDay,
-        cycleLength = cycleLength,
-        periodLength = periodLength,
-        currentPeriodLength = currentPeriodLength,
+        cycleLength = projection.cycleLength,
+        periodLength = projection.periodLength,
+        // The median is a forecast. Once this cycle's period has an end date, that date is a fact.
+        currentPeriodLength = anchor.loggedLength()?.takeIf { it > 0 } ?: projection.periodLength,
         nextPeriodStart = nextPeriodStart,
         daysUntilNextPeriod = daysUntilNextPeriod,
-        isOverdue = covering == null && daysUntilNextPeriod < -OVERDUE_GRACE_DAYS,
-        isPersonalised = measuredCycle != null || measuredPeriod != null
+        isOverdue = !info.isLoggedPeriod && daysUntilNextPeriod < -OVERDUE_GRACE_DAYS,
+        isCycleLengthMeasured = projection.isCycleLengthMeasured,
+        isPeriodLengthMeasured = projection.isPeriodLengthMeasured
     )
 }
-
-/**
- * Phase for an arbitrary date, past or future. Returns null for dates that precede all logged
- * history, which cannot be placed.
- *
- * A one-shot convenience over [CycleProjection]: it rebuilds the projection on every call, so
- * prefer holding a [projectionFrom] result when asking about more than a handful of dates.
- */
-fun computePhaseForDate(date: LocalDate, periods: List<PeriodEntity>): CyclePhase? =
-    projectionFrom(periods).infoFor(date).phase

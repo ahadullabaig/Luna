@@ -2,6 +2,7 @@ package com.luna.app.feature.calendar
 
 import com.luna.app.data.entity.DailyLogEntity
 import com.luna.app.domain.usecase.CycleProjection
+import com.luna.app.domain.usecase.projectionFrom
 import kotlinx.datetime.LocalDate
 
 /**
@@ -14,6 +15,6 @@ data class CalendarUiState(
     val rangeStart: LocalDate,
     val rangeEnd: LocalDate,
     val isLoading: Boolean = true,
-    val projection: CycleProjection = CycleProjection.Empty,
+    val projection: CycleProjection = projectionFrom(emptyList(), today),
     val logsByDate: Map<LocalDate, DailyLogEntity> = emptyMap()
 )

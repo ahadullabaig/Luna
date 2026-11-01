@@ -127,9 +127,12 @@ fun CalendarScreen(
 
             Spacer(Modifier.height(12.dp))
 
+            // English, like every other word in the app. The copy is not localised, so a localised
+            // weekday only put "lun." over an English grid. Which day the week starts on is still
+            // the locale's: that is a convention of the place, not of the language.
             val weekdayLabels = remember(firstDayOfWeek) {
                 daysOfWeek(firstDayOfWeek).map {
-                    it.getDisplayName(TextStyle.SHORT, Locale.getDefault()).take(3)
+                    it.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).take(3)
                 }
             }
             WeekdayHeader(
@@ -139,7 +142,10 @@ fun CalendarScreen(
 
             HorizontalCalendar(
                 state = calendarState,
-                contentPadding = PaddingValues(horizontal = 12.dp),
+                // A modifier, not contentPadding. Content padding lets the neighbouring months draw
+                // into the gutter, and on a device they showed as slivers of coloured cells at both
+                // edges; padding the container clips them to the grid.
+                modifier = Modifier.padding(horizontal = 12.dp),
                 dayContent = { day ->
                     val date = day.date.toKotlinLocalDate()
                     val info = state.projection.infoFor(date)
@@ -260,7 +266,7 @@ private fun MonthHeader(
     ) {
         Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
             Text(
-                text = month.month.getDisplayName(TextStyle.FULL, Locale.getDefault()),
+                text = month.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH),
                 style = MaterialTheme.typography.headlineMedium,
                 color = LunaTextPrimary
             )

@@ -76,21 +76,23 @@ fun HomeScreen(
             // floating button saying nothing. While a period is running that action is ending it:
             // logging another over it is exactly the overlap the dialog would refuse.
             val ending = state.openPeriod != null
+            val label = if (ending) END_PERIOD else LOG_PERIOD
             ExtendedFloatingActionButton(
                 onClick = { showPeriodDialog = true },
                 containerColor = LunaBlush,
                 contentColor = LunaDeepNavy,
                 icon = {
+                    // The label goes on the icon, not just the text. Material3 wraps this button's
+                    // text slot in clearAndSetSemantics {} and takes its accessible name from the
+                    // icon, so with a null description TalkBack announced the app's one primary
+                    // action as a bare "button".
                     Icon(
                         imageVector = if (ending) Icons.Default.Check else Icons.Default.Add,
-                        contentDescription = null
+                        contentDescription = label
                     )
                 },
                 text = {
-                    Text(
-                        text = if (ending) END_PERIOD else LOG_PERIOD,
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    Text(text = label, style = MaterialTheme.typography.titleMedium)
                 }
             )
         }
@@ -246,12 +248,22 @@ private fun EmptyCycleRing() {
 
 @Composable
 private fun CycleFootnote(cycle: CycleState) {
-    // No article before the number: "a 8-day period" was what rendered for an eight-day median.
-    val text = if (cycle.isPersonalised) {
-        "Your recent cycles average ${cycle.cycleLength} days, " +
-            "with periods of ${cycle.periodLength} days."
-    } else {
-        "Still learning. Using ${cycle.cycleLength}-day estimates until you log two cycles."
+    // Each figure is claimed as the user's own only once it is. Start dates alone give a cycle
+    // length and only end dates give a period length, so either can be measured without the other —
+    // and a footnote that called a default "yours" was a guess passing itself off as a record.
+    // No article before a number: "a 8-day period" was what rendered for an eight-day median.
+    val text = when {
+        cycle.isCycleLengthMeasured && cycle.isPeriodLengthMeasured ->
+            "Your recent cycles average ${cycle.cycleLength} days, " +
+                "with periods of ${cycle.periodLength} days."
+        cycle.isCycleLengthMeasured ->
+            "Your recent cycles average ${cycle.cycleLength} days. " +
+                "Log when a period ends and Luna will learn how long yours last."
+        cycle.isPeriodLengthMeasured ->
+            "Your periods average ${cycle.periodLength} days. Cycle length stays a " +
+                "${cycle.cycleLength}-day estimate until you log another period."
+        else ->
+            "Still learning. Using ${cycle.cycleLength}-day estimates until you log two cycles."
     }
     Text(
         text = text,

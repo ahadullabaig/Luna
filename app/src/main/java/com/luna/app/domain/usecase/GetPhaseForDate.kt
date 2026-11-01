@@ -3,6 +3,7 @@ package com.luna.app.domain.usecase
 import com.luna.app.data.repo.CycleRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.datetime.LocalDate
 import javax.inject.Inject
 
 /**
@@ -14,6 +15,6 @@ import javax.inject.Inject
 class GetPhaseForDate @Inject constructor(
     private val repository: CycleRepository
 ) {
-    operator fun invoke(): Flow<CycleProjection> =
-        repository.getAllPeriods().map(::projectionFrom)
+    operator fun invoke(today: LocalDate): Flow<CycleProjection> =
+        repository.getAllPeriods().map { periods -> projectionFrom(periods, today) }
 }

@@ -54,17 +54,24 @@ Single `app` module. MVVM. Package layout by feature, not by layer.
 
 **All five milestones are complete.** Luna builds, signs and installs; there is no next milestone. Milestones 1 (skeleton/theme), 2 (data layer), 3 (home screen), 4 (calendar) and 5 (polish + signed APK) are all done. The M2 debug scaffolding — the period counter and "Insert Fake Period" button — is gone, replaced by the real home screen, and the calendar is reachable from the date icon beside the home header.
 
-A **design pass** then went over both screens: the solid/hollow provenance rule was promoted from the calendar to the whole app, the two 40%-alpha phase colours became opaque constants, cream collapsed from nineteen alphas to five named roles, and the app gained real typography. Six measured defects were fixed along the way — see the Design system, Typography, Phase donut and Calendar sections, which carry the "do not undo this" notes. It was first seen running on the emulator on 2026-10-29, and held up. That look found two things arithmetic had missed: a footnote that rendered "a 8-day period" (fixed), and slivers of the neighbouring months peeking in at both edges of the calendar grid, from `HorizontalCalendar`'s `contentPadding` (not yet fixed).
+A **design pass** then went over both screens: the solid/hollow provenance rule was promoted from the calendar to the whole app, the two 40%-alpha phase colours became opaque constants, cream collapsed from nineteen alphas to five named roles, and the app gained real typography. Six measured defects were fixed along the way — see the Design system, Typography, Phase donut and Calendar sections, which carry the "do not undo this" notes. It was first seen running on the emulator on 2026-10-29, and held up. That look found two things arithmetic had missed, both since fixed: a footnote that rendered "a 8-day period", and slivers of the neighbouring months peeking in at both edges of the calendar grid, from `HorizontalCalendar`'s `contentPadding`.
 
 **Periods can be corrected.** Until 2026-10-29 the only write to `periods` was an insert, so an ongoing period could never be ended — logging the same days again to record the end left a duplicate row — and a mistaken one could never be removed. Now, while an open period covers today, Home's primary button reads **End period**. Any logged period can be re-dated or deleted from its day sheet in the calendar. `ui/common/PeriodDialog.kt` is the one range picker behind all three, and it refuses a range that overlaps another logged period (`overlappingPeriod()` in `CycleMath.kt`). No schema change was needed.
+
+**The floating button's accessible label lives on its icon. Do not set it back to `null`.** Material3 1.3.2's `ExtendedFloatingActionButton` wraps the `text` slot in `clearAndSetSemantics {}` (`FloatingActionButton.kt:395` in the sources jar) and takes the button's name from the icon. With `contentDescription = null`, uiautomator flagged the button `NAF`, and TalkBack had no name to read for "Log a period" or "End period". The icon now carries the same words as the visible text.
 
 **Milestone 5** delivered `proguard-rules.pro` (referenced since M1 but never written, so `assembleRelease` had never once succeeded), an adaptive launcher icon, a navy launch window, and a signing config. The signed APK is 1.8MB against the debug build's 11MB.
 
 **Backup is off, in both of the places Android keeps it.** `allowBackup="false"` opts out of cloud backup on every version Luna runs on. That used to be the whole story, but Android 12 split device-to-device transfer out into `android:dataExtractionRules`, which does not consult `allowBackup` — so setting up a new phone from an old one would have carried the Room database across a network the app claims never to touch. `res/xml/data_extraction_rules.xml` excludes every domain from both `<cloud-backup>` and `<device-transfer>`. This is the file that has to stay right for the local-only claim to be true; if you ever see it edited, that is the claim being edited.
 
-**Known debt, deliberately unaddressed:** `PeriodDao.getRecentPeriods()` and `getLatestPeriod()`, and their `CycleRepository` passthroughs, are dead code (M3 reads full history as a `Flow` instead). `computePhaseForDate()` is reached only from tests.
+**Known debt, deliberately unaddressed:** `PeriodDao.getRecentPeriods()` and `getLatestPeriod()`, and their `CycleRepository` passthroughs, are dead code (M3 reads full history as a `Flow` instead).
 
-**Known, not yet decided:** Home and Calendar still compute "where am I in the cycle" two ways. `computeCycleState` counts the cycle day without bound, while `CycleProjection.infoFor` wraps it modulo `cycleLength`, so once a cycle runs past its prediction the two screens disagree. With the emulator's own data, Home said "Luteal, day 59, 12 days late" while the calendar drew that day as follicular, with an "expected" period painted over days already past. Fixing it needs a product decision about what the calendar should show when a period is late.
+**A late period keeps the cycle open, on both screens.** Home and Calendar used to compute "where am I in the cycle" separately. Home counted on past the prediction, while the calendar wrapped modulo `cycleLength`. On the emulator's own data, Home said "Luteal, day 59, 12 days late" while the calendar drew the same day as follicular, with an "expected" period painted over days already past. The rule decided on 2026-11-01:
+- The running cycle never wraps; it is not over until the next period is logged.
+- A day already behind is never drawn as an expected period.
+- While late, the expected period starts tomorrow, and later cycles are projected from that date, so the window slides a day at a time until the real start is logged.
+
+`computeCycleState` now asks the calendar's `CycleProjection` about today, so there is one implementation and the screens cannot disagree. The accepted cost is that the app cannot tell "late" from "stopped logging": someone who stops for months sees a long luteal stretch rather than plausible past periods. Gaps *between* two logged periods still wrap and draw hollow rings, because there they prompt a missed entry.
 
 ---
 
@@ -74,7 +81,7 @@ Every change gets these three, and you should say which you ran rather than impl
 
 ```bash
 ./gradlew assembleDebug assembleRelease   # compiles, and R8 runs
-./gradlew test                            # 53 tests, 0 failures
+./gradlew test                            # 58 tests, 0 failures
 ./gradlew lint                            # baseline is 23 warnings
 ```
 
@@ -132,11 +139,17 @@ Period length is **inclusive of both endpoints** — `startDate.daysUntil(endDat
 - No periods logged → empty state ("Nothing logged yet" / "Tap Log a period and the ring fills in."), not a donut.
 - Today is inside a logged period → phase is MENSTRUAL regardless of calculation.
 - The period has a logged end that comes before the median length → the days after it are over, not menstrual and not "expected". The median is a forecast and a logged end date is a fact. `CycleState.currentPeriodLength` carries this cycle's own length, the ring is drawn from it, and `infoFor` applies the same rule inside the anchor's cycle. Cycles projected beyond the anchor use only the median.
-- Today is past `nextPeriodStart` + 3-day grace → overdue. This is stated **once**, by the ring's centre number turning blush and reading "N days late". There was briefly a separate `OverdueBanner` above the donut saying the same thing 20dp away; do not reintroduce it.
+- Today is past `nextPeriodStart` + 3-day grace → overdue. This is stated **once**, by the ring's centre number turning blush and reading "N days late". There was briefly a separate `OverdueBanner` above the donut saying the same thing 20dp away; do not reintroduce it. The calendar does not repeat it either. It just keeps the cycle open and starts the expected period tomorrow (see Current status). `nextPeriodStart` is the original prediction, so lateness counts from the day the period was due. `CycleProjection.nextExpectedStart` is the forecast that slides.
+- Cycle and period length are measured independently. Start dates alone give a cycle length, and only end dates give a period length, so `CycleState` carries `isCycleLengthMeasured` and `isPeriodLengthMeasured` separately. The home footnote claims each figure as the user's own only if its flag says so.
 
-**Where this lives:** the pure functions are top-level in `domain/usecase/CycleMath.kt` — `computeCycleState(periods, today)` and `computePhaseForDate(date, periods)` are the entry points, and they take plain lists, not a repository. `GetCurrentCycleState` and `GetPhaseForDate` are thin `Flow` wrappers over `CycleRepository` that delegate to them. Keep new cycle logic in `CycleMath.kt`: the split is what makes it testable without mocking Room.
+**Where this lives:** the pure functions are top-level in `domain/usecase/CycleMath.kt` and `CycleProjection.kt`. `computeCycleState(periods, today)` and `projectionFrom(periods, today).infoFor(date)` are the entry points, and they take plain lists, not a repository. `GetCurrentCycleState` and `GetPhaseForDate` are thin `Flow` wrappers over `CycleRepository` that delegate to them. Keep new cycle logic in `domain/usecase/`: the split is what makes it testable without mocking Room.
 
-Tests are in `app/src/test/java/com/luna/app/` — 53 in total. 47 under `domain/usecase/` cover the medians, every phase boundary day-by-day, the edge cases above, overlap and open-period detection, and the invariant that `phaseSegments()` always sums to `cycleLength`. The other 6 are `feature/home/components/HeroReadingTest` — `heroReading()` is pure and picks which number the ring shows, so it is testable without Compose and worth testing. That is the only exception to "tests are for `domain/usecase/` only": still no Composable tests.
+Tests are in `app/src/test/java/com/luna/app/` — 58 in total. 52 under `domain/usecase/` cover:
+- the medians, and which of them counts as measured
+- every phase boundary, day by day
+- the edge cases above, including the late-period rule
+- overlap and open-period detection
+- the invariant that `phaseSegments()` always sums to `cycleLength` The other 6 are `feature/home/components/HeroReadingTest` — `heroReading()` is pure and picks which number the ring shows, so it is testable without Compose and worth testing. That is the only exception to "tests are for `domain/usecase/` only": still no Composable tests.
 
 ---
 
@@ -226,7 +239,11 @@ The five-item legend is gone. The four colours are named on the home screen wher
 
 **`DayDetailSheet` is read-only for symptoms and editable for periods.** Symptoms are edited only on Home, so there is no second symptom editor to keep in step. But the calendar is the only place a past period can be seen at all, so a logged period day's sheet offers **Edit dates** and **Delete**. `CycleProjection.loggedPeriodOn(date)` finds the row. `CalendarScreen` holds the edit and delete-confirmation state by period id in `rememberSaveable`, the same way it holds the selected day by epoch day. Deleting a period leaves that period's symptom rows alone: a symptom belongs to a day, not to a period.
 
-**`CycleProjection`** (`domain/usecase/CycleProjection.kt`) resolves the medians once and answers `infoFor(date)` per cell — a grid asks about 42 dates, and `computePhaseForDate` would redo the whole median derivation for each. It is a data class so Compose can skip recomposition when history has not changed; `computePhaseForDate` now delegates to it, so there is one implementation of the rule.
+**`CycleProjection`** (`domain/usecase/CycleProjection.kt`) resolves the medians once and answers `infoFor(date)` per cell, since a grid asks about 42 dates. It holds `today`, because the running cycle is placed differently from older ones (see the late-period rule in Current status). It is a data class, so Compose can skip recomposition when neither history nor the date has changed. Home's `computeCycleState` asks it about today, so there is one implementation of the rule.
+
+**Month and weekday names are English**, like every other word in the app. The copy is not localised, so localised names only put a French month above an English grid. Which day the week *starts* on still follows `firstDayOfWeekFromLocale()`, since that is a convention of the place rather than of the language. The Material date picker formats dates by the device's locale; that is the platform's component, and it is left alone.
+
+**The grid's 12dp gutter is a `Modifier.padding`, not `contentPadding`.** Content padding lets the neighbouring month pages draw into the gutter, and on a device they showed as slivers of coloured cells at both edges.
 
 `rememberCalendarState` is keyed on its month bounds via `rememberSaveable(inputs = …)`, so changing them **recreates** the state and resets the scroll. The bounds come from `CalendarUiState.rangeStart/rangeEnd`, which move only when today's month changes — a plain midnight rollover leaves the scroll position alone.
 

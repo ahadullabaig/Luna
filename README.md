@@ -166,10 +166,10 @@ Until you've logged two complete cycles, Luna says so rather than pretending: th
 
 Single-module project. No clean-architecture ceremony. MVVM is enough for a personal app you maintain alone.
 
-The cycle maths lives in `domain/usecase/CycleMath.kt` as plain top-level functions over plain lists — no Room dependency, no repository, no mocks needed. That split is what makes the 53 unit tests possible; they cover every phase boundary day by day, the median derivations, and the edge cases where a phase drops out of a short cycle entirely.
+The cycle maths lives in `domain/usecase/CycleMath.kt` as plain top-level functions over plain lists — no Room dependency, no repository, no mocks needed. That split is what makes the 58 unit tests possible; they cover every phase boundary day by day, the median derivations, and the edge cases where a phase drops out of a short cycle entirely.
 
 ```bash
-./gradlew test    # 53 tests
+./gradlew test    # 58 tests
 ./gradlew lint
 ```
 <br>

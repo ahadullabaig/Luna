@@ -41,7 +41,7 @@ class CalendarViewModel @Inject constructor(
             // One log query for the whole scrollable range: a few years of a single user's rows
             // is a trivial table, and querying per visible month would re-subscribe on every swipe.
             combine(
-                getPhaseForDate(),
+                getPhaseForDate(date),
                 repository.getDailyLogsBetween(start, end)
             ) { projection, logs ->
                 CalendarUiState(

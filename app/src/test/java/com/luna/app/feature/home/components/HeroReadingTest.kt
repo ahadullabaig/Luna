@@ -28,7 +28,8 @@ class HeroReadingTest {
         nextPeriodStart = LocalDate.parse("2026-09-24"),
         daysUntilNextPeriod = daysUntil,
         isOverdue = overdue,
-        isPersonalised = true
+        isCycleLengthMeasured = true,
+        isPeriodLengthMeasured = true
     )
 
     @Test
@@ -46,6 +47,8 @@ class HeroReadingTest {
         assertEquals("3", reading.value)
         assertEquals("day of your period", reading.caption)
         assertFalse(reading.alert)
+        // Read aloud as one phrase, the big number and its caption made "3 day of your period".
+        assertEquals("day 3 of your period", reading.spoken)
     }
 
     @Test

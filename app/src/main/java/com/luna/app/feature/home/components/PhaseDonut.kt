@@ -168,7 +168,9 @@ private fun DrawScope.drawRevealedArc(
 internal data class HeroReading(
     val value: String,
     val caption: String,
-    val alert: Boolean = false
+    val alert: Boolean = false,
+    /** The reading as TalkBack says it, where the number and its caption become one phrase. */
+    val spoken: String = "$value $caption"
 )
 
 internal fun heroReading(state: CycleState): HeroReading = when {
@@ -179,7 +181,10 @@ internal fun heroReading(state: CycleState): HeroReading = when {
     )
     state.currentPhase == CyclePhase.MENSTRUAL -> HeroReading(
         value = state.cycleDay.toString(),
-        caption = "day of your period"
+        caption = "day of your period",
+        // On screen the number sits above its caption; run together aloud it was "3 day of your
+        // period".
+        spoken = "day ${state.cycleDay} of your period"
     )
     state.daysUntilNextPeriod == 0 -> HeroReading(value = "Due", caption = "today")
     state.daysUntilNextPeriod < 0 -> HeroReading(value = "Due", caption = "any day now")
@@ -194,5 +199,5 @@ private fun plural(count: Int, word: String) = if (count == 1) word else "${word
 private fun buildDonutDescription(state: CycleState): String {
     val reading = heroReading(state)
     return "${state.currentPhase.label} phase, day ${state.cycleDay} of a " +
-        "${state.cycleLength} day cycle. ${reading.value} ${reading.caption}."
+        "${state.cycleLength} day cycle. ${reading.spoken.replaceFirstChar { it.uppercase() }}."
 }

@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -61,6 +62,10 @@ class HomeViewModel @Inject constructor(
     // upsertDailyLog replaces the whole row rather than merging columns, so every chip tap has
     // to write a complete entity. Serialising through a mutex and carrying the last write
     // forward keeps two quick taps from racing and dropping one of the two changes.
+    //
+    // The first write of a day reads its base from the database, not from uiState. The chips are
+    // live before uiState's first query lands, and a tap in that window used to start from a blank
+    // row and overwrite everything already saved for today.
     private val logMutex = Mutex()
     private var lastWrittenLog: DailyLogEntity? = null
 
@@ -98,7 +103,7 @@ class HomeViewModel @Inject constructor(
             logMutex.withLock {
                 val date = today.value
                 val base = lastWrittenLog?.takeIf { it.date == date }
-                    ?: uiState.value.todayLog
+                    ?: repository.getDailyLog(date).first()
                     ?: DailyLogEntity(date = date)
                 val updated = transform(base)
                 lastWrittenLog = updated
