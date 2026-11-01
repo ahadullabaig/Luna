@@ -30,7 +30,7 @@ Luna is a **local-only Android period tracker** — no network, no backend, no a
 ./gradlew test
 ```
 
-**Toolchain versions** live in `gradle/libs.versions.toml`. Current: `agp = "9.4.0"`, `kotlin = "2.2.10"`, `ksp = "2.3.6"`, Gradle `9.6.0`.
+**Toolchain versions** live in `gradle/libs.versions.toml`. Current: `agp = "9.4.1"`, `kotlin = "2.2.10"`, `ksp = "2.3.6"`, Gradle `9.6.0`.
 
 KSP no longer carries a Kotlin version prefix — KSP2 versions independently, so `ksp = "2.3.6"` pairs with `kotlin = "2.2.10"` with no lockstep rule to honour. (Earlier revisions of this file claimed the prefix must match; that was true of KSP1's `2.1.20-1.0.31` scheme and is no longer.) If a Kotlin bump breaks annotation processing, bump `ksp` to its own latest rather than hunting for a matching prefix.
 
@@ -133,7 +133,7 @@ grep -A8 '^com\.luna\.app\.domain\.model\.FlowLevel ->' \
 
 **Averaging:** `cycleLength` = median gap over last 6 periods. `periodLength` = median over last 6 *completed* periods (exclude rows where `endDate` is null). Fall back to 28/5 if fewer than 2 completed cycles.
 
-Period length is **inclusive of both endpoints** — `startDate.daysUntil(endDate) + 1`, so a period that starts and ends on the same day is 1 day, not 0. PLAN.md §6 used to write this as `endDate - startDate`, which is off by one; that has been corrected in the plan, but the general rule still holds — where PLAN.md and the code disagree, the code is right.
+Period length is **inclusive of both endpoints** — `startDate.daysUntil(endDate) + 1`, so a period that starts and ends on the same day is 1 day, not 0. `docs/PLAN.md` §6 used to write this as `endDate - startDate`, which is off by one; that has been corrected in the plan, but the general rule still holds — where the plan and the code disagree, the code is right.
 
 **Edge cases that must be handled explicitly:**
 - No periods logged → empty state ("Nothing logged yet" / "Tap Log a period and the ring fills in."), not a donut.
@@ -297,6 +297,12 @@ The crescent in `res/drawable/ic_launcher_foreground.xml` is the region between 
 **The manifest also removes an activity Luna never declared.** `com.kizitonwose.calendar:compose` depends on `ui-tooling` at runtime, not just in debug, and `ui-tooling`'s manifest contributes `androidx.compose.ui.tooling.PreviewActivity` with `exported="true"`. Until 2026-10-29 every release APK shipped a Compose preview launcher that any app on the phone could start inside Luna's process. A `tools:node="remove"` entry strips it, and R8 then drops the class. The source manifest is not the surface — the merged one is, and libraries add to it. Check with `aapt2 dump xmltree` on the APK (see Verifying your work), which should show exactly one activity, one signature-level `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` from androidx.core, and no `INTERNET`.
 
 ---
+
+## Publishing: releases and README visuals
+
+**A release is a tag, a signed APK and its checksum.** v2.0 is the first: tag `v2.0` on the commit the APK was built from, with the asset named `Luna-<versionName>.apk` and a `.sha256` file beside it. The release notes print the signing certificate's SHA-256 (`556501dabf85…f6bc`, CN=Luna), and the README tells people to compare it. Bump `versionCode` and `versionName` before building, and run the checks in Verifying your work on the exact APK you upload. The README's release badge and Download link read from `releases/latest`, so they need no edit.
+
+**`docs/images/` holds the README's visuals.** `screenshots.png` (the four-screen showcase), `icon.png` and `social-preview.png` (1280×640, uploaded by hand in the repo's Settings, since GitHub has no API for it). They are real emulator captures of seeded demo data, never the user's own history. The emulator clock was set to 16 and 3 November 2026 (`settings put global auto_time 0`, then `date`), and SystemUI demo mode gave a 9:41 status bar. Each was then laid out in SVG and rendered with `rsvg-convert`, in Luna's own fonts through a private `FONTCONFIG_FILE` that points at `res/font/`. If the UI changes visibly, retake them the same way, and put `auto_time` back to 1 afterwards.
 
 ## What is intentionally out of scope
 
